@@ -589,3 +589,13 @@ Backend :8000
 6. Historical analytical snapshots must remain reproducible.
 7. Do not introduce microservices without a concrete deployment or scaling need.
 8. Do not add infrastructure only because it may be useful later.
+# Current demo additions
+
+- `backend/app/auth/`: isolated demo token authentication
+- `backend/app/agents/`: grounded assistant prompt and structured opportunity tools
+- `backend/app/telemetry/`: lightweight request telemetry
+- `backend/app/repositories/investigation_repository.py`: workflow persistence and immutable events
+- `frontend/src/auth/`: auth context and protected/role routes
+- `frontend/src/components/opportunity/SharedOpportunityDetail.tsx`: shared five-tab evidence UI
+- `frontend/src/pages/investigation-expert/`: expert dashboard and investigation workflow
+- `backend/Dockerfile`, `frontend/Dockerfile`, `frontend/nginx.conf`: production containers

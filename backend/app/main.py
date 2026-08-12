@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.config import settings
+from app.telemetry.middleware import RequestTelemetryMiddleware
 
 
 app = FastAPI(
@@ -18,13 +19,15 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:4321",
+        "http://localhost:5432",
         "http://127.0.0.1:4321",
+        "http://localhost:5173"
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(RequestTelemetryMiddleware)
 
 
 @app.get("/")

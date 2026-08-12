@@ -9,6 +9,9 @@ from app.repositories.opportunity_repository import (
 
 class OpportunityService:
 
+    def get_timeseries(self, db: Connection, opportunity_id: str):
+        return opportunity_repository.get_timeseries(db, opportunity_id)
+
     # ========================================================
     # LIST
     # ========================================================

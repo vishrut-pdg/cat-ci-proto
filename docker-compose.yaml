@@ -1,0 +1,39 @@
+services:
+  postgres:
+    build: ./postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-cat_ci}
+      POSTGRES_USER: ${POSTGRES_USER:-cat_ci}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cat_ci_demo}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes: ["cat_ci_data:/var/lib/postgresql/data"]
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-cat_ci}:${POSTGRES_PASSWORD:-cat_ci_demo}@postgres:5432/${POSTGRES_DB:-cat_ci}
+      DEMO_AUTH_SECRET: ${DEMO_AUTH_SECRET:-local-demo-secret}
+      GOOGLE_CLOUD_PROJECT: ${GOOGLE_CLOUD_PROJECT:-}
+      GOOGLE_CLOUD_LOCATION: ${GOOGLE_CLOUD_LOCATION:-us-central1}
+      GOOGLE_GENAI_USE_VERTEXAI: ${GOOGLE_GENAI_USE_VERTEXAI:-true}
+      GOOGLE_APPLICATION_CREDENTIALS: /credentials/google-credentials.json
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+    ports: ["8000:8000"]
+    depends_on:
+      postgres: {condition: service_healthy}
+    volumes:
+      - ${GOOGLE_APPLICATION_CREDENTIALS_HOST:-/Users/vishrut/.config/gcloud/application_default_credentials.json}:/credentials/google-credentials.json:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  frontend:
+    build: ./frontend
+    ports: ["5173:80"]
+    depends_on:
+      backend: {condition: service_healthy}
+volumes: {cat_ci_data: {}}

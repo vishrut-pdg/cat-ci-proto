@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     database_url: str
 
     api_v1_prefix: str = "/api/v1"
+    demo_auth_secret: str = "cat-ci-demo-secret-change-me"
 
     model_config = SettingsConfigDict(
         env_file=".env",

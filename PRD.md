@@ -542,3 +542,6 @@ The prototype is complete when a user can:
 12. execute it,
 13. record an outcome,
 14. use the outcome as future RecSys feedback.
+# Implemented demo workflow
+
+The prototype now supports demo authentication for Sarah Smith (Finance Analyst) and Priya Patel (Investigation Expert), generic opportunity routes, a shared analytical detail experience, 12-month database-backed metrics, assignment, findings, recommendation drafting, submission, grounded Ask Anything responses, and application/AI telemetry. Demo authentication is explicitly non-production and is isolated for later SSO replacement.

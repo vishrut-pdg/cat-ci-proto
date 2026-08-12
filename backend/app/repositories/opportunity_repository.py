@@ -6,6 +6,16 @@ from sqlalchemy.engine import Connection
 
 class OpportunityRepository:
 
+    def get_timeseries(self, db: Connection, opportunity_id: str) -> list[dict[str, Any]]:
+        result = db.execute(text("""
+            SELECT snapshot_at::date::text AS period, unit_cost, peer_average_cost,
+                   variance_amount, variance_percent, annual_volume,
+                   annual_spend, potential_savings, confidence_score, impact_score
+            FROM opportunity.metric_snapshots
+            WHERE opportunity_id=:opportunity_id ORDER BY snapshot_at
+        """), {"opportunity_id": opportunity_id})
+        return [dict(row) for row in result.mappings().all()]
+
     # ========================================================
     # LIST
     # ========================================================

@@ -8,4 +8,5 @@ dependencies = [
     "pydantic-settings>=2.15.0",
     "sqlalchemy>=2.0.51",
     "uvicorn[standard]>=0.52.1",
+    "google-adk>=1.0.0",
 ]

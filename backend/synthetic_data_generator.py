@@ -313,6 +313,7 @@ CREATE SCHEMA IF NOT EXISTS opportunity;
 CREATE SCHEMA IF NOT EXISTS identity_data;
 CREATE SCHEMA IF NOT EXISTS recsys;
 CREATE SCHEMA IF NOT EXISTS workflow;
+CREATE SCHEMA IF NOT EXISTS telemetry;
 
 
 -- ==========================================================
@@ -540,7 +541,42 @@ CREATE TABLE opportunity.logistics_trend (
     opportunity_id          text NOT NULL REFERENCES opportunity.opportunities(id),
     period_start            date NOT NULL,
     actual_cost             numeric NOT NULL,
-    peer_average_cost       numeric NOT NULL
+    peer_average_cost       numeric NOT NULL,
+    ocean_freight           numeric NOT NULL DEFAULT 0,
+    import_duty             numeric NOT NULL DEFAULT 0,
+    local_transport         numeric NOT NULL DEFAULT 0,
+    insurance               numeric NOT NULL DEFAULT 0,
+    packaging               numeric NOT NULL DEFAULT 0,
+    handling_other          numeric NOT NULL DEFAULT 0
+);
+
+CREATE TABLE opportunity.plant_cost_trend (
+    id text PRIMARY KEY, opportunity_id text NOT NULL REFERENCES opportunity.opportunities(id),
+    plant_id text NOT NULL REFERENCES supply.plants(id), period_start date NOT NULL,
+    unit_cost numeric NOT NULL, peer_average_cost numeric NOT NULL,
+    variance_percent numeric NOT NULL, purchase_volume integer NOT NULL
+);
+
+CREATE TABLE opportunity.supplier_cost_trend (
+    id text PRIMARY KEY, opportunity_id text NOT NULL REFERENCES opportunity.opportunities(id),
+    supplier_id text NOT NULL REFERENCES supply.suppliers(id), period_start date NOT NULL,
+    unit_cost numeric NOT NULL, peer_average_cost numeric NOT NULL, annualized_volume integer NOT NULL,
+    annualized_spend numeric NOT NULL, quality_score numeric NOT NULL, delivery_score numeric NOT NULL
+);
+
+CREATE TABLE opportunity.tariff_trend (
+    id text PRIMARY KEY, opportunity_id text NOT NULL REFERENCES opportunity.opportunities(id),
+    plant_id text NOT NULL REFERENCES supply.plants(id), period_start date NOT NULL, hs_code text NOT NULL,
+    duty_rate numeric NOT NULL, peer_average_duty_rate numeric NOT NULL,
+    import_duty_per_unit numeric NOT NULL, peer_duty_per_unit numeric NOT NULL,
+    annualized_duty_impact numeric NOT NULL
+);
+
+CREATE TABLE opportunity.opportunity_events (
+    id text PRIMARY KEY, opportunity_id text NOT NULL REFERENCES opportunity.opportunities(id),
+    event_type text NOT NULL, actor_user_id text, actor_role text NOT NULL,
+    entity_type text NOT NULL, entity_id text, payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+    created_at timestamptz NOT NULL
 );
 
 CREATE TABLE opportunity.tariff_details (
@@ -660,6 +696,34 @@ CREATE TABLE workflow.investigations (
     assigned_at         timestamptz NOT NULL,
     due_at              date NOT NULL,
     progress_percent    numeric NOT NULL
+);
+
+CREATE TABLE workflow.findings (
+    id text PRIMARY KEY, investigation_id text NOT NULL REFERENCES workflow.investigations(id),
+    summary text NOT NULL, created_by text NOT NULL REFERENCES identity_data.users(id), created_at timestamptz NOT NULL
+);
+
+CREATE TABLE workflow.expert_consultations (
+    id text PRIMARY KEY, investigation_id text NOT NULL REFERENCES workflow.investigations(id),
+    expert_user_id text NOT NULL REFERENCES identity_data.users(id), notes text, created_at timestamptz NOT NULL
+);
+
+CREATE TABLE telemetry.ai_sessions (
+    id text PRIMARY KEY, user_id text NOT NULL, opportunity_id text NOT NULL, role text NOT NULL,
+    created_at timestamptz NOT NULL, last_activity_at timestamptz NOT NULL
+);
+CREATE TABLE telemetry.ai_interactions (
+    id text PRIMARY KEY, session_id text NOT NULL REFERENCES telemetry.ai_sessions(id), user_message text NOT NULL,
+    assistant_message text, model_name text NOT NULL, latency_ms integer, input_tokens integer, output_tokens integer,
+    created_at timestamptz NOT NULL, status text NOT NULL, error_message text
+);
+CREATE TABLE telemetry.agent_tool_calls (
+    id text PRIMARY KEY, interaction_id text NOT NULL REFERENCES telemetry.ai_interactions(id), tool_name text NOT NULL,
+    arguments jsonb NOT NULL, duration_ms integer NOT NULL, success boolean NOT NULL, created_at timestamptz NOT NULL
+);
+CREATE TABLE telemetry.api_requests (
+    id bigserial PRIMARY KEY, endpoint text NOT NULL, method text NOT NULL, status_code integer NOT NULL,
+    duration_ms integer NOT NULL, user_role text, created_at timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE TABLE workflow.recommendations (
@@ -1581,24 +1645,24 @@ def generate_dataset(
             )
         )
 
-        metric_snapshots.append(
-            (
-                f"METRIC-{index:06d}",
-                opportunity_id,
-                datetime(2026, 6, 12, 7, 45),
-                unit_cost,
-                peer_average,
-                variance_amount,
-                variance_percent,
-                annual_volume,
-                annual_spend,
-                potential_savings,
-                impact_score,
-                confidence,
-                "SIMILAR_PLANTS",
-                "features-v1",
-            )
-        )
+        # Smooth monthly history; the final point always matches the current snapshot.
+        for month_index, period in enumerate(MONTHS):
+            distance = 11 - month_index
+            historical_unit = round2(unit_cost * (1 - distance * 0.0025) + math.sin(month_index / 2) * unit_cost * 0.003)
+            historical_peer = round2(peer_average * (1 - distance * 0.0015))
+            historical_variance = round2(historical_unit - historical_peer)
+            historical_pct = round2(historical_variance / historical_peer * 100) if historical_peer else 0
+            metric_snapshots.append((
+                f"METRIC-{index:06d}-{month_index + 1:02d}", opportunity_id,
+                datetime(period.year, period.month, 12, 7, 45),
+                unit_cost if month_index == 11 else historical_unit,
+                peer_average if month_index == 11 else historical_peer,
+                variance_amount if month_index == 11 else historical_variance,
+                variance_percent if month_index == 11 else historical_pct,
+                annual_volume, annual_spend,
+                potential_savings if month_index == 11 else round2(potential_savings * (0.88 + month_index * 0.01)),
+                impact_score, confidence, "SIMILAR_PLANTS", "features-v2",
+            ))
 
         opportunity_meta[opportunity_id] = {
             "part_id": part_id,
@@ -1622,33 +1686,30 @@ def generate_dataset(
                 (
                     "LOGISTICS_DUTIES",
                     "Logistics & Duties",
-                    26.08,
+                    22.77,
                     6.2,
                 ),
                 (
                     "SUPPLIER_PRICE",
                     "Supplier Price",
-                    22.14,
+                    14.69,
                     4.0,
                 ),
                 (
                     "LOWER_VOLUME",
                     "Lower Volume",
-                    15.43,
+                    10.28,
                     2.8,
                 ),
                 (
                     "SPECIFICATION_DIFF",
                     "Specification Difference",
-                    11.02,
+                    7.35,
                     2.0,
                 ),
             ]
         else:
-            total_pct = max(
-                3.0,
-                abs(variance_percent),
-            )
+            total_pct = abs(variance_percent)
 
             driver_weights = [
                 rng.uniform(0.30, 0.45),
@@ -3409,8 +3470,11 @@ JOIN catalog.parts p
     ON p.id = o.part_id
 JOIN supply.plants pl
     ON pl.id = o.plant_id
-JOIN opportunity.metric_snapshots m
-    ON m.opportunity_id = o.id;
+JOIN LATERAL (
+    SELECT * FROM opportunity.metric_snapshots ms
+    WHERE ms.opportunity_id = o.id
+    ORDER BY ms.snapshot_at DESC LIMIT 1
+) m ON true;
 """
         )
 

@@ -29,6 +29,10 @@ router = APIRouter(
     tags=["Opportunities"],
 )
 
+@router.get("/{opportunity_id}/timeseries")
+def get_opportunity_timeseries(opportunity_id: str, db: Annotated[Connection, Depends(get_db)]):
+    return {"opportunity_id": opportunity_id, "items": opportunity_service.get_timeseries(db, opportunity_id)}
+
 
 # ============================================================
 # LIST
