@@ -30,7 +30,7 @@ export default function SharedOpportunityDetail({opportunityId,role}:{opportunit
    {tab==="suppliers"&&<SuppliersTab suppliers={supplierRows}/>} 
    {tab==="logistics"&&<LogisticsTab logistics={logistics} rows={logRows}/>} 
    {tab==="tariff"&&<TariffTab tariff={tariff} unitCost={m.unit_cost} peerCost={m.peer_average_cost}/>} 
-  </section><aside className="opp-side"><AskPanel opportunityId={opportunityId} tab={tab}/><AIRecommendation opp={opp}/>{role==="FINANCE_ANALYST"?<section className="assignment-card"><header><span className="assignment-icon">♙</span><div><small>FINAL HANDOFF</small><h3>Expert assignment</h3><p>Route this opportunity to an investigation expert for final validation.</p></div></header><div className={`assignment-state ${opp.status==="ASSIGNED"?"assigned":"unassigned"}`}><span/><div><small>ASSIGNMENT STATUS</small><b>{opp.status==="ASSIGNED"?"Assigned":"Unassigned"}</b></div>{opp.status==="ASSIGNED"&&<strong>Priya Patel</strong>}</div><div className={`assignment-actions ${opp.status==="ASSIGNED"?"single":""}`}>{opp.status!=="ASSIGNED"&&<button onClick={assign}>Assign expert</button>}{opp.status==="ASSIGNED"&&<button className="withdraw" onClick={withdraw}>Withdraw assignment</button>}</div>{notice&&<p className="action-notice">{notice}</p>}</section>:<section className={`decision-card ${decision?"decided":""}`}><small>FINAL HANDOFF</small><h3>{decision?"Recommendation recorded":"Record your recommendation"}</h3><p>{decision?"Your decision is saved and reflected in the live opportunity status.":"Use the evidence and AI analysis above to submit a decision."}</p><div className="decision-actions"><button aria-pressed={opp.status==="APPROVED"} className={opp.status==="APPROVED"?"selected":""} onClick={()=>decide("APPROVED")}>Move forward</button><button aria-pressed={opp.status==="ABSTAINED"} className={opp.status==="ABSTAINED"?"selected":""} onClick={()=>decide("ABSTAINED")}>Abstain</button><button aria-pressed={opp.status==="REJECTED"} className={opp.status==="REJECTED"?"selected":""} onClick={()=>decide("REJECTED")}>Reject</button></div>{decision&&<div className="decision-result"><span>✓</span><div><small>CURRENT DECISION</small><b>{decision.label}</b><p>{decision.detail}</p></div></div>}{notice&&<p className="action-notice error">{notice}</p>}</section>}</aside></div>
+  </section><aside className="opp-side"><AskPanel opportunityId={opportunityId} tab={tab}/><AIRecommendation opp={opp} role={role}/>{role==="FINANCE_ANALYST"?<section className="assignment-card"><header><span className="assignment-icon">♙</span><div><small>FINAL HANDOFF</small><h3>Expert assignment</h3><p>Route this opportunity to an investigation expert for final validation.</p></div></header><div className={`assignment-state ${opp.status==="ASSIGNED"?"assigned":"unassigned"}`}><span/><div><small>ASSIGNMENT STATUS</small><b>{opp.status==="ASSIGNED"?"Assigned":"Unassigned"}</b></div>{opp.status==="ASSIGNED"&&<strong>Priya Patel</strong>}</div><div className={`assignment-actions ${opp.status==="ASSIGNED"?"single":""}`}>{opp.status!=="ASSIGNED"&&<button onClick={assign}>Assign expert</button>}{opp.status==="ASSIGNED"&&<button className="withdraw" onClick={withdraw}>Withdraw assignment</button>}</div>{notice&&<p className="action-notice">{notice}</p>}</section>:<section className={`decision-card ${decision?"decided":""}`}><small>FINAL HANDOFF</small><h3>{decision?"Recommendation recorded":"Record your recommendation"}</h3><p>{decision?"Your decision is saved and reflected in the live opportunity status.":"Use the evidence and AI analysis above to submit a decision."}</p><div className="decision-actions"><button aria-pressed={opp.status==="APPROVED"} className={opp.status==="APPROVED"?"selected":""} onClick={()=>decide("APPROVED")}>Move forward</button><button aria-pressed={opp.status==="ABSTAINED"} className={opp.status==="ABSTAINED"?"selected":""} onClick={()=>decide("ABSTAINED")}>Abstain</button><button aria-pressed={opp.status==="REJECTED"} className={opp.status==="REJECTED"?"selected":""} onClick={()=>decide("REJECTED")}>Reject</button></div>{decision&&<div className="decision-result"><span>✓</span><div><small>CURRENT DECISION</small><b>{decision.label}</b><p>{decision.detail}</p></div></div>}{notice&&<p className="action-notice error">{notice}</p>}</section>}</aside></div>
  </main>;
 }
 
@@ -41,7 +41,70 @@ function LogisticsTab({logistics,rows}:{logistics:LogisticsResponse|null;rows:Lo
 function TariffTab({tariff,unitCost,peerCost}:{tariff:TariffResponse|null;unitCost:number;peerCost:number}){if(!tariff)return <Empty/>;return <><div className="tariff-kpis">{[["Import Duty Cost (USD)",money(tariff.import_duty_per_unit)],["Peer Plant Average (USD)",money(tariff.peer_duty_per_unit)],["Duty Cost Variance (USD)",signedMoney(tariff.duty_variance_per_unit)],["Annual Duty Impact (USD)",money(tariff.annual_duty_impact,true)]].map(([a,b])=><div key={a}><small>{a}</small><b>{b}</b></div>)}</div><div className="detail-grid two"><Card title="Import Duty by Plant" sub="Duty rate %"><VerticalBars format="percent" items={tariff.plant_comparisons.map((x,i)=>({label:x.plant_code,value:x.duty_rate,hot:i===tariff.plant_comparisons.length-1}))}/></Card><Card title="Import Cost Breakdown"><DataTable heads={["Cost Element","Current (USD)","Peer Avg (USD)","Difference (USD)"]} rows={[["Base Component Value",money(unitCost),money(peerCost),signedMoney(unitCost-peerCost)],["Import Duty",money(tariff.import_duty_per_unit),money(tariff.peer_duty_per_unit),signedMoney(tariff.duty_variance_per_unit)]]}/></Card></div><Card title="Duty Rate Details"><div className="tariff-details"><span>Product HS Code <b>{tariff.hs_code}</b></span><span>Calculation Basis <b>{tariff.calculation_basis}</b></span><span>Current Duty Rate <b>{tariff.duty_rate}%</b></span><span>Valuation Type <b>{tariff.valuation_type}</b></span><span>Peer Average Duty Rate <b>{tariff.peer_average_duty_rate}%</b></span><span>Effective Date <b>{tariff.effective_date}</b></span></div></Card></>}
 
 function Card({title,sub,children}:{title:string;sub?:string;children:React.ReactNode}){return <section className="analysis-panel"><h2>{title}{sub&&<small>{sub}</small>}</h2>{children}</section>}
-function AIRecommendation({opp}:{opp:OpportunityDetailResponse}){const m=opp.metrics;const gap=m.unit_cost-m.peer_average_cost;return <section className="ai-recommendation"><header><span>✦</span><div><small>AI RECOMMENDATION</small><h3>Prioritize expert validation</h3></div><b>HIGH VALUE</b></header><p><strong>{opp.part.part_number}</strong> is priced at <strong>{money(m.unit_cost)} per unit</strong>, which is <strong>{money(gap)} above</strong> the peer average of {money(m.peer_average_cost)}.</p><div><span><small>ANNUAL OPPORTUNITY</small><b>{money(m.potential_savings,true)}</b></span><span><small>MODEL CONFIDENCE</small><b>{Math.round(m.confidence_score*100)}%</b></span></div><p className="recommendation-next"><b>Recommended next step:</b> validate the leading cost drivers with an investigation expert before the final sourcing decision.</p></section>}
+
+function AIRecommendation({opp, role}:{opp:OpportunityDetailResponse; role:Role}){
+  const m=opp.metrics;
+  const gap=m.unit_cost-m.peer_average_cost;
+
+  const config = (() => {
+    switch(role) {
+      case "FINANCE_ANALYST":
+        return {
+          title: "Prioritize expert validation",
+          badge: "HIGH VALUE",
+          icon: "✦",
+          content: (
+            <>
+              <p><strong>{opp.part.part_number}</strong> is priced at <strong>{money(m.unit_cost)} per unit</strong>, which is <strong>{money(gap)} above</strong> the peer average of {money(m.peer_average_cost)}.</p>
+              <div><span><small>ANNUAL OPPORTUNITY</small><b>{money(m.potential_savings,true)}</b></span><span><small>MODEL CONFIDENCE</small><b>{Math.round(m.confidence_score*100)}%</b></span></div>
+              <p className="recommendation-next"><b>Recommended next step:</b> validate the leading cost drivers with an investigation expert before the final sourcing decision.</p>
+            </>
+          )
+        };
+      
+      case "INVESTIGATION_EXPERT":
+        return {
+            title: "Negotiate supplier pricing",
+            badge: "ACTION REQUIRED",
+            icon: "✦",
+            content: (
+            <>
+                <p>Part <strong>{opp.part.part_number}</strong> has multiple supplier options available. Current cost is <strong>{money(m.unit_cost)} per unit</strong> with a variance of <strong>{money(gap)}</strong> from peers.</p>
+                <div><span><small>VARIANCE AMOUNT</small><b>{money(m.variance_amount)}</b></span><span><small>MODEL CONFIDENCE</small><b>{Math.round(m.confidence_score*100)}%</b></span></div>
+                <p className="recommendation-next"><b>Recommended action:</b> Initiate price negotiation with current supplier using peer benchmarks as reference. Evaluate alternative suppliers to establish competitive leverage and secure cost reduction.</p>
+            </>
+            )
+        };
+      
+      default:
+        return {
+          title: "Opportunity analysis",
+          badge: "REVIEW",
+          icon: "✦",
+          content: (
+            <>
+              <p><strong>{opp.part.part_number}</strong> is priced at <strong>{money(m.unit_cost)} per unit</strong>, which is <strong>{money(gap)} above</strong> the peer average of {money(m.peer_average_cost)}.</p>
+              <div><span><small>POTENTIAL SAVINGS</small><b>{money(m.potential_savings,true)}</b></span><span><small>CONFIDENCE</small><b>{Math.round(m.confidence_score*100)}%</b></span></div>
+            </>
+          )
+        };
+    }
+  })();
+
+  return (
+    <section className="ai-recommendation">
+      <header>
+        <span>{config.icon}</span>
+        <div>
+          <small>AI RECOMMENDATION</small>
+          <h3>{config.title}</h3>
+        </div>
+        <b>{config.badge}</b>
+      </header>
+      {config.content}
+    </section>
+  );
+}
 function VerticalBars({items,format="currency"}:{items:{label:string;value:number;hot?:boolean}[];format?:"currency"|"percent"|"number"}){const max=Math.max(...items.map(x=>x.value),1),formatLabel=(value:number)=>format==="currency"?money(value):format==="percent"?`${value.toFixed(1)}%`:value.toLocaleString();return <div className="vertical-bars">{items.map((x,i)=><div key={`${x.label}-${i}`}><b>{formatLabel(x.value)}</b><i style={{height:`${Math.max(8,x.value/max*82)}%`}} className={x.hot?"hot":""}/><span>{x.label}</span></div>)}</div>}
 function DataTable({heads,rows}:{heads:string[];rows:(string|number)[][]}){return rows.length?<div className="table-wrap detail-table"><table><thead><tr>{heads.map(h=><th key={h}>{h}</th>)}</tr></thead><tbody>{rows.map((r,i)=><tr key={i}>{r.map((c,j)=><td key={j}>{c}</td>)}</tr>)}</tbody></table></div>:<Empty/>}
 function DriverDonut({drivers,varianceAmount}:{drivers:OverviewResponse["cost_drivers"];varianceAmount:number}){const [active,setActive]=useState(0);const total=drivers.reduce((sum,d)=>sum+Math.abs(d.impact_amount),0)||1;const colors=["#ef3d48","#f28b00","#f5b914","#18a46b","#64748b"];const share=(value:number)=>Math.abs(value)/total*100;const segments=drivers.reduce<{start:number;end:number;color:string}[]>((all,d,i)=>{const start=all.at(-1)?.end??0;return [...all,{start,end:start+share(d.impact_amount),color:colors[i%colors.length]}]},[]);const stops=segments.map(x=>`${x.color} ${x.start}% ${x.end}%`).join(",");const selected=drivers[active];return <div className="driver-visual"><div className="driver-chart-wrap"><div className="driver-ring" style={{background:stops?`conic-gradient(${stops})`:"#e5e7eb"}}>{selected&&<span><small>SELECTED DRIVER</small><b>{selected.name}</b><strong>{money(Math.abs(selected.impact_amount))}<em>/ unit</em></strong></span>}</div><p>Total explained variance <b>{money(Math.abs(varianceAmount))} per unit</b></p></div><div className="driver-breakdown">{drivers.map((d,i)=><button type="button" className={active===i?"active":""} onMouseEnter={()=>setActive(i)} onFocus={()=>setActive(i)} key={d.code}><i style={{background:colors[i%colors.length]}}/><span><strong>{d.name}</strong><small>{d.explanation}</small></span><b>{money(Math.abs(d.impact_amount))}<em>{share(d.impact_amount).toFixed(0)}% of explained variance</em></b></button>)}</div></div>}
