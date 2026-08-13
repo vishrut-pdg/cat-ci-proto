@@ -1,0 +1,81 @@
+services:
+  postgres:
+    build: ./postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-cat_ci}
+      POSTGRES_USER: ${POSTGRES_USER:-cat_ci}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - cat_ci_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    deploy:
+      resources:
+        limits: {cpus: "0.60", memory: 1536M}
+        reservations: {cpus: "0.15", memory: 512M}
+    logging: &default-logging
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-cat_ci}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cat_ci}
+      DEMO_AUTH_SECRET: ${DEMO_AUTH_SECRET}
+      GOOGLE_CLOUD_PROJECT: ${GOOGLE_CLOUD_PROJECT}
+      GOOGLE_CLOUD_LOCATION: ${GOOGLE_CLOUD_LOCATION:-us-central1}
+      GOOGLE_GENAI_USE_VERTEXAI: "true"
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+    depends_on:
+      postgres: {condition: service_healthy}
+    expose: ["8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits: {cpus: "1.00", memory: 2048M}
+        reservations: {cpus: "0.25", memory: 512M}
+    logging: *default-logging
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      backend: {condition: service_healthy}
+    expose: ["80"]
+    deploy:
+      resources:
+        limits: {cpus: "0.25", memory: 256M}
+        reservations: {cpus: "0.05", memory: 64M}
+    logging: *default-logging
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [frontend]
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deployment/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    deploy:
+      resources:
+        limits: {cpus: "0.25", memory: 256M}
+        reservations: {cpus: "0.05", memory: 64M}
+    logging: *default-logging
+
+volumes:
+  cat_ci_data:
+  caddy_data:
+  caddy_config:

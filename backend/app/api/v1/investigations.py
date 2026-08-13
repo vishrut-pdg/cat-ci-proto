@@ -27,6 +27,10 @@ def investigation(opportunity_id: str, db: Annotated[Connection, Depends(get_db)
 def assign(opportunity_id: str, body: AssignBody, db: Annotated[Connection, Depends(get_db)], user: Annotated[dict, Depends(current_user)]):
     return investigation_service.assign(db, opportunity_id, body.expert_user_id, user)
 
+@router.post("/opportunities/{opportunity_id}/withdraw")
+def withdraw(opportunity_id: str, db: Annotated[Connection, Depends(get_db)], user: Annotated[dict, Depends(current_user)]):
+    return investigation_service.withdraw(db, opportunity_id, user)
+
 @router.post("/investigations/{investigation_id}/findings")
 def finding(investigation_id: str, body: FindingBody, db: Annotated[Connection, Depends(get_db)], user: Annotated[dict, Depends(current_user)]):
     return investigation_service.finding(db, investigation_id, body.summary, user)

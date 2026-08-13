@@ -4,6 +4,7 @@ import { BrowserRouter } from "react-router";
 
 import App from "./App";
 import "./styles/global.css";
+import "./styles/refinements.css";
 
 createRoot(
   document.getElementById("root")!,

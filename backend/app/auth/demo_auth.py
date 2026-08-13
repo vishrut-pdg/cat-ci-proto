@@ -18,6 +18,11 @@ USERS = {
     "USER-002": {"id": "USER-002", "name": "Priya Patel", "role": "INVESTIGATION_EXPERT", "email": "priya.patel@cat.com"},
 }
 
+USERNAMES = {
+    "sarah.smith": "USER-001",
+    "priya.patel": "USER-002",
+}
+
 
 def _secret() -> bytes:
     return getattr(settings, "demo_auth_secret", "cat-ci-demo-secret-change-me").encode()

@@ -7,6 +7,8 @@ from fastapi import (
     Query,
 )
 from sqlalchemy.engine import Connection
+from pydantic import BaseModel
+from app.auth.demo_auth import current_user
 
 from app.db.session import get_db
 from app.schemas.opportunity import (
@@ -28,6 +30,20 @@ router = APIRouter(
     prefix="/opportunities",
     tags=["Opportunities"],
 )
+
+class StatusBody(BaseModel):
+    status: str
+
+@router.post("/{opportunity_id}/status")
+def update_opportunity_status(opportunity_id: str, body: StatusBody,
+    db: Annotated[Connection, Depends(get_db)], user: Annotated[dict, Depends(current_user)]):
+    allowed = {"SHORTLISTED", "REJECTED", "APPROVED", "ABSTAINED"}
+    if body.status not in allowed:
+        raise HTTPException(status_code=400, detail="Unsupported opportunity status")
+    result = opportunity_service.update_status(db, opportunity_id, body.status, user)
+    if not result:
+        raise HTTPException(status_code=404, detail="Opportunity not found")
+    return result
 
 @router.get("/{opportunity_id}/timeseries")
 def get_opportunity_timeseries(opportunity_id: str, db: Annotated[Connection, Depends(get_db)]):

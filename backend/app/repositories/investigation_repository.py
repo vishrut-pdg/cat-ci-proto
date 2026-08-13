@@ -6,6 +6,15 @@ from sqlalchemy.engine import Connection
 
 
 class InvestigationRepository:
+    def withdraw(self, db: Connection, opportunity_id: str, actor: dict) -> dict:
+        row = db.execute(text("""UPDATE workflow.investigations SET status='WITHDRAWN'
+          WHERE opportunity_id=:oid AND status <> 'WITHDRAWN' RETURNING *"""), {"oid": opportunity_id}).mappings().first()
+        if not row:
+            return {"opportunity_id": opportunity_id, "status": "UNASSIGNED"}
+        db.execute(text("UPDATE opportunity.opportunities SET status='SHORTLISTED', current_owner_id=NULL, updated_at=now() WHERE id=:oid"), {"oid": opportunity_id})
+        self.event(db, opportunity_id, "ASSIGNMENT_WITHDRAWN", actor, "investigation", row["id"], {})
+        db.commit()
+        return {"opportunity_id": opportunity_id, "status": "UNASSIGNED"}
     def list(self, db: Connection, owner_id: str | None = None) -> list[dict[str, Any]]:
         query = """
           SELECT i.id, i.opportunity_id, i.owner_user_id, i.status,

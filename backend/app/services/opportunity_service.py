@@ -9,6 +9,9 @@ from app.repositories.opportunity_repository import (
 
 class OpportunityService:
 
+    def update_status(self, db: Connection, opportunity_id: str, status: str, actor: dict):
+        return opportunity_repository.update_status(db, opportunity_id, status, actor)
+
     def get_timeseries(self, db: Connection, opportunity_id: str):
         return opportunity_repository.get_timeseries(db, opportunity_id)
 

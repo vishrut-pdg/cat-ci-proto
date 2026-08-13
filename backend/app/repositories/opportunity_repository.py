@@ -6,6 +6,24 @@ from sqlalchemy.engine import Connection
 
 class OpportunityRepository:
 
+    def update_status(self, db: Connection, opportunity_id: str, status: str, actor: dict) -> dict[str, Any] | None:
+        row = db.execute(text("""
+            UPDATE opportunity.opportunities
+            SET status=:status, updated_at=now()
+            WHERE id=:opportunity_id
+            RETURNING id AS opportunity_id, status
+        """), {"status": status, "opportunity_id": opportunity_id}).mappings().first()
+        if row:
+            db.execute(text("""
+                INSERT INTO opportunity.opportunity_events
+                (id,opportunity_id,event_type,actor_user_id,actor_role,entity_type,entity_id,payload,created_at)
+                VALUES (:id,:oid,'STATUS_CHANGED',:uid,:role,'opportunity',:oid,CAST(:payload AS jsonb),now())
+            """), {"id": f"EVT-{__import__('uuid').uuid4().hex.upper()}", "oid": opportunity_id,
+                    "uid": actor["id"], "role": actor["role"],
+                    "payload": __import__('json').dumps({"status": status})})
+            db.commit()
+        return dict(row) if row else None
+
     def get_timeseries(self, db: Connection, opportunity_id: str) -> list[dict[str, Any]]:
         result = db.execute(text("""
             SELECT snapshot_at::date::text AS period, unit_cost, peer_average_cost,
