@@ -26,15 +26,25 @@ The API is available at `http://localhost:8000`; OpenAPI documentation is at
 ## Demo database refresh
 
 When `RESET_DEMO_DATA_ON_START=true`, `docker-entrypoint.sh` runs `app.db.demo_seed` before Uvicorn.
-The refresh:
+The destructive local refresh:
 
 1. drops and recreates the prototype schemas from `001_seed.sql.gz`;
 2. seeds the Executive role and Robert Miller from `002_executive_role.sql`;
 3. creates and maps equipment categories from `003_equipment_categories.sql`;
-4. shifts all twelve metric-snapshot points so the latest point equals the rebuild timestamp.
+4. starts from the same deterministic twelve metric snapshots.
 
-This makes every rebuild deterministic in value while keeping **Data as of** current. Set reset to
-`false` if workflow changes should survive backend restarts.
+After the optional reset, `app.db.runtime_migrations` always applies the idempotent Executive-role
+and equipment-taxonomy SQL. This is required for existing production volumes because PostgreSQL
+does not rerun `/docker-entrypoint-initdb.d` after initial volume creation. When
+`ROLL_DEMO_SNAPSHOTS_ON_START=true`, the same startup step shifts the twelve-point history so its
+newest snapshot equals the current startup timestamp. Set reset to `false` if workflow changes
+should survive backend restarts.
+
+The migration is non-destructive and safe to rerun:
+
+```bash
+uv run python -m app.db.runtime_migrations
+```
 
 ## Executive semantics
 

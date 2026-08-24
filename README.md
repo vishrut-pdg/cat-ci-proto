@@ -96,6 +96,23 @@ cd backend && PYTHONPATH=. uv run --with pytest pytest -q
 docker compose config
 ```
 
+## Update an existing production VM
+
+Production keeps its PostgreSQL volume and does not run the destructive demo reset. The backend
+entrypoint therefore applies the idempotent Executive-role and equipment-taxonomy migrations on
+every start before Uvicorn. Deploy from the repository root on the VM with:
+
+```bash
+git pull
+docker compose -f docker-compose.prod.yaml build --no-cache backend frontend
+docker compose -f docker-compose.prod.yaml up -d --force-recreate backend frontend
+docker compose -f docker-compose.prod.yaml logs --tail=100 backend
+```
+
+Successful startup includes `CAT CI runtime database migrations applied.` Existing opportunities,
+workflow state, reports, and Docker volumes are preserved. Do not use `docker compose down -v` for
+an upgrade because `-v` deletes the database and report volumes.
+
 The seed is deterministic (seed `42`) and contains 500 parts, 27 plants, 100 suppliers, 128 opportunities, 12 monthly snapshots per opportunity, structured cost drivers, persisted ranking results, and workflow records. Regenerating it preserves `OPP-000001` as the stable reference record without introducing application-level special cases. Snapshot timestamps roll forward at startup; business values remain deterministic.
 
 ## Architecture

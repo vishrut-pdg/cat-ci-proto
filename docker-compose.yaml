@@ -26,6 +26,7 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-cat_ci}:${POSTGRES_PASSWORD:-cat_ci_demo}@postgres:5432/${POSTGRES_DB:-cat_ci}
       RESET_DEMO_DATA_ON_START: ${RESET_DEMO_DATA_ON_START:-true}
+      ROLL_DEMO_SNAPSHOTS_ON_START: ${ROLL_DEMO_SNAPSHOTS_ON_START:-true}
       DEMO_AUTH_SECRET: ${DEMO_AUTH_SECRET:-local-demo-secret}
       GOOGLE_CLOUD_PROJECT: ${GOOGLE_CLOUD_PROJECT:-}
       GOOGLE_CLOUD_LOCATION: ${GOOGLE_CLOUD_LOCATION:-global}

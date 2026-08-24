@@ -61,19 +61,6 @@ def refresh_demo_data() -> None:
                 connection.execute(executive_seed_path.read_text(encoding="utf-8"))
             if taxonomy_seed_path.exists():
                 connection.execute(taxonomy_seed_path.read_text(encoding="utf-8"))
-            # Preserve deterministic values and the twelve-point history while
-            # making the newest snapshot reflect this demo rebuild.
-            connection.execute("""
-                WITH latest AS (
-                    SELECT MAX(snapshot_at) AS snapshot_at
-                    FROM opportunity.metric_snapshots
-                )
-                UPDATE opportunity.metric_snapshots AS snapshot
-                SET snapshot_at = snapshot.snapshot_at
-                    + (CURRENT_TIMESTAMP - latest.snapshot_at)
-                FROM latest
-                WHERE latest.snapshot_at IS NOT NULL
-            """)
         finally:
             connection.execute("SELECT pg_advisory_unlock(42642026)")
 
