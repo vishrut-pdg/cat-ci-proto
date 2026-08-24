@@ -1,75 +1,63 @@
-# React + TypeScript + Vite
+# CAT Cost Intelligence frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React 19, TypeScript, Vite, and React Router frontend for the role-based CAT Cost Intelligence
+demo. API access is centralized in `src/services`; executive pages do not contain independent
+financial calculations or screen-specific mock values.
 
-Currently, two official plugins are available:
+## Run locally
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+For the complete application, run from the repository root:
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+cp .env.example .env
+docker compose up --build
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+For frontend development against an API at `http://localhost:8000`:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+npm ci
+npm run dev
 ```
+
+The Vite app is available at `http://localhost:5173`. `VITE_API_BASE_URL` defaults to `/api/v1` in
+the containerized build.
+
+## Executive routes
+
+```text
+/executive                         Guidance Home, Ask Katty, quick wins, report generator
+/executive/plants                  Plant comparison
+/executive/products                Product comparison with equipment-category filter
+/executive/products/:productId     Product detail, trend, cost drivers, report/team actions
+/executive/categories              Equipment-category ranking
+/executive/categories/:categoryId  Category summary and product drill-down
+/executive/components/:componentId Component opportunity brief
+```
+
+The UI uses the hierarchy **Category → Product → Component → Cost Driver**. Category means equipment
+family; Logistics, Tariff, Material, Supplier Price, Volume, and similar terms are displayed only
+as cost drivers. All drill-downs use generic IDs from React Router.
+
+## Data freshness
+
+API responses include the latest snapshot timestamp. `ExecutiveFilters` formats it using the
+browser's local timezone and shows both current date and time. With demo reset enabled, backend
+startup rolls the twelve-snapshot history forward, so the displayed **Data as of** timestamp follows
+each rebuild rather than remaining fixed at 12 Jun 2026.
+
+## Ask Katty and generated reports
+
+Guidance Home contains the executive chat, four suggested prompts, and enterprise report generator.
+Product Detail contains **Generate report** and **Send to team** actions. Generated PDFs are stored
+in MinIO by the backend and downloaded through an authenticated API URL; the frontend never talks
+to MinIO directly.
+
+## Build and verification
+
+```bash
+npm run build
+npm run lint
+```
+
+`npm run build` runs the TypeScript project build before Vite creates the production bundle.

@@ -1,7 +1,7 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 import { apiRequest } from "../services/api";
 
-export type Role = "FINANCE_ANALYST" | "INVESTIGATION_EXPERT";
+export type Role = "FINANCE_ANALYST" | "INVESTIGATION_EXPERT" | "EXECUTIVE";
 export interface DemoUser { id: string; name: string; role: Role; email: string }
 interface AuthValue { user: DemoUser | null; login: (id: string, password: string) => Promise<DemoUser>; logout: () => void }
 const AuthContext = createContext<AuthValue | null>(null);
