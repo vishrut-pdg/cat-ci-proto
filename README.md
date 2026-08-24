@@ -41,6 +41,15 @@ GEMINI_MODEL=gemini-2.5-flash
 The complete guide uses local Application Default Credentials and explains the Docker mount. Without
 cloud configuration, Ask Katty remains usable with deterministic database-grounded answers.
 
+## Generated reports / MinIO
+
+AI-grounded executive PDFs are stored in the `executive-reports` bucket in the local MinIO service.
+The application downloads them through an authenticated FastAPI endpoint; MinIO is not exposed
+directly to the browser. The object data persists in the `cat_ci_reports` Docker volume even when
+the PostgreSQL demo seed is refreshed. The local MinIO console is available at
+[http://localhost:9001](http://localhost:9001), using `MINIO_ACCESS_KEY` and
+`MINIO_SECRET_KEY` from `.env`.
+
 ## Development and verification
 
 ```bash
