@@ -1,0 +1,12 @@
+import { useEffect, useState } from "react";
+import ExecutiveFilters from "../../components/executive/ExecutiveFilters";
+import { ExecutiveError, ExecutiveLoading } from "../../components/executive/ExecutiveState";
+import { money, percent } from "../../components/executive/executiveFormat";
+import { getExecutivePlants, type ExecutiveFilters as Filters } from "../../services/executive";
+import type { PlantExecutiveItem } from "../../types/executive";
+
+export default function PlantComparisonPage() {
+  const [filters, setFilters] = useState<Filters>({ period: "FY26", scope: "enterprise" }); const [items, setItems] = useState<PlantExecutiveItem[] | null>(null); const [date, setDate] = useState(""); const [error, setError] = useState("");
+  useEffect(() => { let active = true; getExecutivePlants(filters).then(result => { if (active) { setItems(result.items); setDate(result.as_of_date); setError(""); } }).catch(err => active && setError(err instanceof Error ? err.message : "Request failed")); return () => { active = false; }; }, [filters]);
+  return <main className="executive-page"><div className="executive-heading"><div><span className="eyebrow">PORTFOLIO COMPARISON</span><h1>Plant performance</h1><p>Opportunity-weighted cost position and the evidence driving attention.</p></div><ExecutiveFilters value={filters} onChange={setFilters} asOfDate={date}/></div>{error ? <ExecutiveError message={error}/> : !items ? <ExecutiveLoading/> : <section className="executive-table-panel"><div className="section-title"><div><h2>Enterprise plant ranking</h2><p>{items.length} plants with current opportunity evidence</p></div></div><div className="table-wrap"><table><thead><tr><th>Plant</th><th>Weighted unit cost</th><th>Variance</th><th>Potential savings</th><th>Attention</th><th>Primary driver</th><th>Benchmark</th><th>Opportunities</th></tr></thead><tbody>{items.map(item => <tr key={item.plant_id}><td><strong>{item.plant_name}</strong><small>{item.plant_code} · {item.country}</small></td><td>{money(Number(item.unit_cost), false)}</td><td className={Number(item.variance_percent) > 0 ? "metric-risk" : "metric-good"}>{percent(Number(item.variance_percent))}</td><td><strong>{money(Number(item.potential_savings))}</strong></td><td><span className={`executive-chip ${item.attention_level.toLowerCase()}`}>{item.attention_level}</span></td><td>{item.primary_driver ?? "—"}</td><td>{item.benchmark_status.replaceAll("_", " ")}</td><td>{item.opportunity_count}</td></tr>)}</tbody></table></div></section>}</main>;
+}

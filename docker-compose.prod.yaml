@@ -21,18 +21,39 @@ services:
       driver: json-file
       options: {max-size: "10m", max-file: "3"}
 
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+    volumes:
+      - cat_ci_reports:/data
+    expose: ["9000", "9001"]
+    logging: *default-logging
+
   backend:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-cat_ci}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-cat_ci}
+      RESET_DEMO_DATA_ON_START: "false"
       DEMO_AUTH_SECRET: ${DEMO_AUTH_SECRET}
       GOOGLE_CLOUD_PROJECT: ${GOOGLE_CLOUD_PROJECT}
-      GOOGLE_CLOUD_LOCATION: ${GOOGLE_CLOUD_LOCATION:-us-central1}
+      GOOGLE_CLOUD_LOCATION: ${GOOGLE_CLOUD_LOCATION:-global}
       GOOGLE_GENAI_USE_VERTEXAI: "true"
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_REPORT_BUCKET: ${MINIO_REPORT_BUCKET:-executive-reports}
+      MINIO_SECURE: "false"
     depends_on:
       postgres: {condition: service_healthy}
+      minio: {condition: service_started}
     expose: ["8000"]
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
@@ -77,5 +98,6 @@ services:
 
 volumes:
   cat_ci_data:
+  cat_ci_reports:
   caddy_data:
   caddy_config:

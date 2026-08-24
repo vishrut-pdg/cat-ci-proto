@@ -61,3 +61,17 @@ export async function apiRequest<T>(path: string, method = "POST", body?: unknow
   }
   return response.json() as Promise<T>;
 }
+
+export async function apiDownload(path: string): Promise<Blob> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    headers: {
+      Accept: "application/pdf",
+      ...(localStorage.getItem("cat_ci_token") ? { Authorization: `Bearer ${localStorage.getItem("cat_ci_token")}` } : {}),
+    },
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new ApiError(response.status, data.detail ?? "Download failed");
+  }
+  return response.blob();
+}

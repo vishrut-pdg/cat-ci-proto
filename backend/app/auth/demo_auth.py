@@ -8,7 +8,7 @@ import json
 import time
 from dataclasses import dataclass
 
-from fastapi import Header, HTTPException
+from fastapi import Depends, Header, HTTPException
 
 from app.config import settings
 
@@ -16,11 +16,13 @@ from app.config import settings
 USERS = {
     "USER-001": {"id": "USER-001", "name": "Sarah Smith", "role": "FINANCE_ANALYST", "email": "sarah.smith@cat.com"},
     "USER-002": {"id": "USER-002", "name": "Priya Patel", "role": "INVESTIGATION_EXPERT", "email": "priya.patel@cat.com"},
+    "USER-031": {"id": "USER-031", "name": "Robert Miller", "role": "EXECUTIVE", "email": "robert.miller@cat.com"},
 }
 
 USERNAMES = {
     "sarah.smith": "USER-001",
     "priya.patel": "USER-002",
+    "robert.miller": "USER-031",
 }
 
 
@@ -52,3 +54,13 @@ def current_user(authorization: str | None = Header(default=None)) -> dict:
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Authentication required")
     return decode_token(authorization.removeprefix("Bearer "))
+
+
+def require_role(*roles: str):
+    """Create a FastAPI dependency that restricts a route to named roles."""
+    def dependency(user: dict = Depends(current_user)) -> dict:
+        if user["role"] not in roles:
+            raise HTTPException(status_code=403, detail="This workspace is not available for your role")
+        return user
+
+    return dependency
