@@ -6,17 +6,13 @@ from pathlib import Path
 
 import psycopg
 
-from app.config import settings
+from app.db.connection import psycopg_connection_kwargs
 
 
 MIGRATION_FILES = (
     "002_executive_role.sql",
     "003_equipment_categories.sql",
 )
-
-
-def _database_dsn() -> str:
-    return settings.database_url.replace("postgresql+psycopg://", "postgresql://", 1)
 
 
 def apply_runtime_migrations() -> None:
@@ -26,7 +22,7 @@ def apply_runtime_migrations() -> None:
     if missing:
         raise RuntimeError(f"Runtime migration files not found: {', '.join(missing)}")
 
-    with psycopg.connect(_database_dsn(), autocommit=True) as connection:
+    with psycopg.connect(**psycopg_connection_kwargs(), autocommit=True) as connection:
         connection.execute("SELECT pg_advisory_lock(42642027)")
         try:
             for path in paths:

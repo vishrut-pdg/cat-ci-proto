@@ -11,6 +11,7 @@ os.environ.setdefault(
 from fastapi.testclient import TestClient
 
 from app.agents.prompts import EXECUTIVE_PROMPT, PERSONA_PROMPTS
+from app.db.connection import psycopg_connection_kwargs
 from app.main import app
 from app.repositories.executive_repository import LATEST_FACTS_CTE
 from app.services.executive_service import executive_service
@@ -46,6 +47,14 @@ class ExecutiveAuthorizationTests(unittest.TestCase):
 
 
 class ExecutiveFilterPolicyTests(unittest.TestCase):
+    def test_startup_connection_preserves_literal_password_characters(self):
+        password = "$" + "(openssl rand -hex 24)"
+        params = psycopg_connection_kwargs(
+            f"postgresql+psycopg://cat_ci:{password}@postgres:5432/cat_ci"
+        )
+        self.assertEqual(params["password"], password)
+        self.assertEqual(params["dbname"], "cat_ci")
+
     def test_each_persona_has_a_distinct_prompt(self):
         self.assertEqual(
             set(PERSONA_PROMPTS),

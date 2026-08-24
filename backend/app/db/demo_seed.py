@@ -7,17 +7,13 @@ from pathlib import Path
 
 import psycopg
 
-from app.config import settings
+from app.db.connection import psycopg_connection_kwargs
 
 
 SCHEMAS = (
     "telemetry", "workflow", "recsys", "identity_data", "opportunity",
     "economics", "supply", "catalog",
 )
-
-
-def _database_dsn() -> str:
-    return settings.database_url.replace("postgresql+psycopg://", "postgresql://", 1)
 
 
 def _execute_copy_seed(connection: psycopg.Connection, seed_path: Path) -> None:
@@ -51,7 +47,7 @@ def refresh_demo_data() -> None:
     if not seed_path.exists():
         raise RuntimeError(f"Demo seed file not found: {seed_path}")
 
-    with psycopg.connect(_database_dsn(), autocommit=True) as connection:
+    with psycopg.connect(**psycopg_connection_kwargs(), autocommit=True) as connection:
         connection.execute("SELECT pg_advisory_lock(42642026)")
         try:
             schema_list = ", ".join(SCHEMAS)
