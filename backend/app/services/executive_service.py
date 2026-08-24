@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime, time, timezone
 import re
 
 from sqlalchemy.engine import Connection
@@ -8,15 +8,15 @@ from app.repositories.executive_repository import executive_repository
 
 class ExecutiveService:
     def resolve_as_of_date(self, db: Connection, *, as_of_date: date | None,
-                           period: str | None) -> date:
-        requested = as_of_date or date.today()
+                           period: str | None) -> datetime:
+        requested = (
+            datetime.combine(as_of_date, time.max, tzinfo=timezone.utc)
+            if as_of_date else datetime.now(timezone.utc)
+        )
         if period:
             match = re.fullmatch(r"FY(\d{2}|\d{4})", period.upper())
             if not match:
                 raise ValueError("period must use FY26 or FY2026 format")
-            value = int(match.group(1))
-            year = value + 2000 if value < 100 else value
-            requested = min(requested, date(year, 6, 30))
         return executive_repository.get_as_of_date(db, requested)
 
     @staticmethod
@@ -50,6 +50,7 @@ class ExecutiveService:
 
     def product_detail(self, db: Connection, *, product_id: str, **filters):
         filters.pop("product_id", None)
+        filters.pop("category_id", None)
         resolved = self.resolve_as_of_date(db, as_of_date=filters.pop("as_of_date"), period=filters.pop("period"))
         self.validate_scope(filters.pop("scope"))
         result = executive_repository.get_product_detail(
@@ -59,6 +60,7 @@ class ExecutiveService:
 
     def product_trend(self, db: Connection, *, product_id: str, **filters):
         filters.pop("product_id", None)
+        filters.pop("category_id", None)
         resolved = self.resolve_as_of_date(db, as_of_date=filters.pop("as_of_date"), period=filters.pop("period"))
         self.validate_scope(filters.pop("scope"))
         detail = executive_repository.get_product_detail(
@@ -72,6 +74,7 @@ class ExecutiveService:
 
     def product_cost_drivers(self, db: Connection, *, product_id: str, **filters):
         filters.pop("product_id", None)
+        filters.pop("category_id", None)
         resolved = self.resolve_as_of_date(db, as_of_date=filters.pop("as_of_date"), period=filters.pop("period"))
         self.validate_scope(filters.pop("scope"))
         detail = executive_repository.get_product_detail(
@@ -79,9 +82,10 @@ class ExecutiveService:
         )
         if not detail:
             return None
-        return {"as_of_date": resolved, **executive_repository.get_categories(
-            db, as_of_date=resolved, product_id=product_id, **filters,
-        )}
+        return {"as_of_date": resolved, "product_id": product_id,
+                **executive_repository.get_cost_drivers(
+                    db, as_of_date=resolved, product_id=product_id, **filters,
+                )}
 
     def component_detail(self, db: Connection, *, component_id: str, **filters):
         resolved = self.resolve_as_of_date(db, as_of_date=filters.pop("as_of_date"), period=filters.pop("period"))
@@ -94,8 +98,9 @@ class ExecutiveService:
     def categories(self, db: Connection, **filters):
         resolved = self.resolve_as_of_date(db, as_of_date=filters.pop("as_of_date"), period=filters.pop("period"))
         self.validate_scope(filters.pop("scope"))
-        return {"as_of_date": resolved, **executive_repository.get_categories(
-            db, as_of_date=resolved, **filters)}
+        return {"as_of_date": resolved, "categories":
+                executive_repository.get_equipment_categories(
+                    db, as_of_date=resolved, **filters)}
 
     def report(self, db: Connection, **filters):
         original = dict(filters)
@@ -110,6 +115,8 @@ class ExecutiveService:
             "summary": summary,
             "plants": executive_repository.get_plants(db, as_of_date=resolved, **query_filters),
             "products": executive_repository.get_products(db, as_of_date=resolved, **query_filters),
+            "categories": executive_repository.get_equipment_categories(
+                db, as_of_date=resolved, **query_filters),
             "quick_wins": executive_repository.get_quick_wins(db, as_of_date=resolved, limit=5, **query_filters),
         }
 

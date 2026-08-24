@@ -7,7 +7,8 @@ from sqlalchemy.engine import Connection
 from app.auth.demo_auth import require_role
 from app.db.session import get_db
 from app.schemas.executive import (
-    CategoriesExecutiveResponse, ComponentDetailResponse, ExecutiveReportResponse, ExecutiveSummaryResponse, PlantsExecutiveResponse,
+    ComponentDetailResponse, CostDriversResponse, EquipmentCategoriesResponse,
+    ExecutiveReportResponse, ExecutiveSummaryResponse, PlantsExecutiveResponse,
     ProductDetailResponse, ProductsExecutiveResponse, ProductTrendResponse, QuickWinsResponse,
 )
 from app.services.executive_service import executive_service
@@ -28,9 +29,11 @@ def common_filters(
     region: str | None = Query(default=None),
     plant_id: str | None = Query(default=None),
     product_id: str | None = Query(default=None),
+    category_id: str | None = Query(default=None),
 ) -> dict:
     return {"as_of_date": as_of_date, "period": period, "scope": scope,
-            "region": region, "plant_id": plant_id, "product_id": product_id}
+            "region": region, "plant_id": plant_id, "product_id": product_id,
+            "category_id": category_id}
 
 
 Filters = Annotated[dict, Depends(common_filters)]
@@ -95,7 +98,7 @@ def product_trend(product_id: str, db: Database, filters: ProductFilters):
     return result
 
 
-@router.get("/products/{product_id}/cost-drivers", response_model=CategoriesExecutiveResponse)
+@router.get("/products/{product_id}/cost-drivers", response_model=CostDriversResponse)
 def product_cost_drivers(product_id: str, db: Database, filters: ProductFilters):
     result = handle(lambda: executive_service.product_cost_drivers(db, product_id=product_id, **filters))
     if result is None:
@@ -103,7 +106,7 @@ def product_cost_drivers(product_id: str, db: Database, filters: ProductFilters)
     return result
 
 
-@router.get("/categories", response_model=CategoriesExecutiveResponse)
+@router.get("/categories", response_model=EquipmentCategoriesResponse)
 def categories(db: Database, filters: Filters):
     return handle(lambda: executive_service.categories(db, **filters))
 

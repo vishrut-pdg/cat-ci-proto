@@ -13,7 +13,7 @@ class ExecutiveEntitySummary(BaseModel):
 
 
 class ExecutiveSummaryResponse(BaseModel):
-    as_of_date: date
+    as_of_date: datetime
     top_plant: ExecutiveEntitySummary | None
     top_product: ExecutiveEntitySummary | None
     top_category: ExecutiveEntitySummary | None
@@ -34,7 +34,7 @@ class QuickWin(BaseModel):
 
 
 class QuickWinsResponse(BaseModel):
-    as_of_date: date
+    as_of_date: datetime
     items: list[QuickWin]
 
 
@@ -53,7 +53,7 @@ class PlantExecutiveItem(BaseModel):
 
 
 class PlantsExecutiveResponse(BaseModel):
-    as_of_date: date
+    as_of_date: datetime
     items: list[PlantExecutiveItem]
 
 
@@ -61,6 +61,8 @@ class ProductExecutiveItem(BaseModel):
     product_id: str
     product_name: str
     equipment_family: str
+    category_id: str
+    category_name: str
     average_unit_cost: Decimal
     highest_cost_plant: str | None
     lowest_cost_plant: str | None
@@ -71,7 +73,7 @@ class ProductExecutiveItem(BaseModel):
 
 
 class ProductsExecutiveResponse(BaseModel):
-    as_of_date: date
+    as_of_date: datetime
     attribution_policy: str = Field(
         default="PRIMARY_COMPATIBLE_MODEL",
         description="Each part is assigned to one stable equipment model for portfolio aggregation.",
@@ -94,7 +96,7 @@ class ProductPlantItem(BaseModel):
 class ProductComponentItem(BaseModel):
     component_id: str
     component_name: str
-    category: str
+    part_classification: str
     potential_savings: Decimal
     variance_percent: Decimal
     confidence_score: Decimal
@@ -103,10 +105,12 @@ class ProductComponentItem(BaseModel):
 
 
 class ProductDetailResponse(BaseModel):
-    as_of_date: date
+    as_of_date: datetime
     product_id: str
     product_name: str
     equipment_family: str
+    category_id: str
+    category_name: str
     average_unit_cost: Decimal
     benchmark_unit_cost: Decimal
     variance_amount: Decimal
@@ -138,7 +142,7 @@ class ProductTrendSeries(BaseModel):
 
 
 class ProductTrendResponse(BaseModel):
-    as_of_date: date
+    as_of_date: datetime
     product_id: str
     series: list[ProductTrendSeries]
 
@@ -162,10 +166,10 @@ class ComponentProductItem(BaseModel):
 
 
 class ComponentDetailResponse(BaseModel):
-    as_of_date: date
+    as_of_date: datetime
     component_id: str
     component_name: str
-    category: str
+    part_classification: str
     annual_opportunity: Decimal
     annual_spend: Decimal
     annual_volume: int
@@ -191,27 +195,47 @@ class ComponentDetailResponse(BaseModel):
     products: list[ComponentProductItem]
 
 
-class CategoryExecutiveItem(BaseModel):
-    category_code: str
-    category: str
+class EquipmentCategoryItem(BaseModel):
+    category_id: str
+    category_name: str
+    product_count: int
+    annual_spend: Decimal
+    potential_savings: Decimal
+    cost_variance_percent: Decimal
+    high_priority_opportunities: int
+    confidence: Decimal
+    primary_opportunity_driver: str | None
+    priority: str
+
+
+class EquipmentCategoriesResponse(BaseModel):
+    as_of_date: datetime
+    categories: list[EquipmentCategoryItem]
+
+
+class CostDriverItem(BaseModel):
+    driver_code: str
+    driver_name: str
     benchmark_cost: Decimal
     comparison_cost: Decimal
     gap: Decimal
     contribution_percent: Decimal
 
 
-class CategoriesExecutiveResponse(BaseModel):
-    as_of_date: date
+class CostDriversResponse(BaseModel):
+    as_of_date: datetime
+    product_id: str
     overall_gap: Decimal
     contribution_total: Decimal
-    items: list[CategoryExecutiveItem]
+    drivers: list[CostDriverItem]
 
 
 class ExecutiveReportResponse(BaseModel):
-    as_of_date: date
+    as_of_date: datetime
     period: str | None
     scope: str
     summary: ExecutiveSummaryResponse
     plants: list[PlantExecutiveItem]
     products: list[ProductExecutiveItem]
+    categories: list[EquipmentCategoryItem]
     quick_wins: list[QuickWin]

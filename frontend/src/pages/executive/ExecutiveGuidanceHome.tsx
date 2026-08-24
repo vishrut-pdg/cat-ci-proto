@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import ExecutiveFilters from "../../components/executive/ExecutiveFilters";
 import { ExecutiveError, ExecutiveLoading } from "../../components/executive/ExecutiveState";
-import { money, percent } from "../../components/executive/executiveFormat";
+import { asOf, money, percent } from "../../components/executive/executiveFormat";
 import { askExecutiveKatty, downloadExecutiveReport, generateExecutiveReport, getExecutiveSummary, getQuickWins, type ExecutiveFilters as Filters } from "../../services/executive";
 import type { ExecutiveSummary, GeneratedExecutiveReport, QuickWin } from "../../types/executive";
 
@@ -81,8 +81,8 @@ export default function ExecutiveGuidanceHome() {
 
   const cards = summary ? [
     ["Top plant", summary.top_plant, "/executive/plants"],
-    ["Top product", summary.top_product, summary.top_product ? `/executive/products/${summary.top_product.id}` : "/executive/products"],
     ["Top category", summary.top_category, "/executive/categories"],
+    ["Top product", summary.top_product, summary.top_product ? `/executive/products/${summary.top_product.id}` : "/executive/products"],
     ["Top component", summary.top_component, summary.top_component ? `/executive/components/${summary.top_component.id}` : "/executive/categories"],
   ] as const : [];
 
@@ -100,7 +100,7 @@ export default function ExecutiveGuidanceHome() {
         {messages.length > 0 && <div className="executive-chat-thread" aria-live="polite">{messages.map((message, index) => <article className={message.role} key={`${message.role}-${index}`}><small>{message.role === "user" ? "You" : "Katty"}</small>{message.role === "assistant" ? <AssistantText text={message.content}/> : <p>{message.content}</p>}</article>)}{chatBusy && <article className="assistant typing"><small>Katty</small><div><i/><i/><i/></div></article>}</div>}
         {messages.length === 0 && <div className="executive-question-grid">{questions.map(item => <button key={item} disabled={chatBusy} onClick={() => send(item)}>{item}<span>→</span></button>)}</div>}
         <div className="executive-chat-input"><input value={question} disabled={chatBusy} onChange={event => setQuestion(event.target.value)} onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); send(); } }} placeholder={chatBusy ? "Katty is analyzing portfolio evidence…" : "Ask Katty for executive guidance…"}/><button disabled={chatBusy || !question.trim()} onClick={() => send()}>{chatBusy ? "Working…" : "Send"}</button></div>
-        <footer><span>Answers use structured portfolio evidence as of {summary.as_of_date}.</span>{providerNote && <span>{providerNote}; using the deterministic grounded response.</span>}{messages.length > 0 && <button onClick={() => { setMessages([]); setSessionId(undefined); setProvider("ready"); setProviderNote(""); }}>New conversation</button>}</footer>
+        <footer><span>Answers use structured portfolio evidence as of {asOf(summary.as_of_date)}.</span>{providerNote && <span>{providerNote}; using the deterministic grounded response.</span>}{messages.length > 0 && <button onClick={() => { setMessages([]); setSessionId(undefined); setProvider("ready"); setProviderNote(""); }}>New conversation</button>}</footer>
       </section>
       <section>
         <div className="section-title"><div><span className="eyebrow">TOP PRIORITIES</span><h2>Value concentration at a glance</h2></div><span>Ranked by backend policy</span></div>
@@ -112,7 +112,7 @@ export default function ExecutiveGuidanceHome() {
       </section>
       <section className="executive-report-generator">
         <header><span>▤</span><div><small>AI-GROUNDED REPORTING</small><h2>Generate executive report</h2><p>Create a concise leadership report from the latest PostgreSQL evidence and recommended actions.</p></div>{report && <b className={`assistant-status ${report.provider}`}>{report.provider === "vertex_ai" ? "Vertex AI" : "Grounded demo"}</b>}</header>
-        {!report ? <div className="report-generator-action"><div><span><small>REPORTING PERIOD</small><b>{filters.period ?? "FY26"}</b></span><span><small>SCOPE</small><b>Enterprise</b></span></div><button disabled={reportBusy} onClick={createReport}>{reportBusy ? "Katty is generating the report…" : "Generate AI report"}</button>{reportError && <p>{reportError}</p>}</div> : <div className="generated-report"><div className="generated-report-meta"><span>Generated from data as of <b>{report.as_of_date}</b></span><span>Stored in MinIO · {report.provider_note ? "deterministic narrative used" : `${report.model} narrative`}</span></div><AssistantText text={report.narrative}/>{reportError && <p className="report-download-error">{reportError}</p>}<footer><button className="secondary" onClick={() => { setReport(null); setReportError(""); }}>Generate again</button><button onClick={downloadReport}>Download PDF</button></footer></div>}
+        {!report ? <div className="report-generator-action"><div><span><small>REPORTING PERIOD</small><b>{filters.period ?? "FY26"}</b></span><span><small>SCOPE</small><b>Enterprise</b></span></div><button disabled={reportBusy} onClick={createReport}>{reportBusy ? "Katty is generating the report…" : "Generate AI report"}</button>{reportError && <p>{reportError}</p>}</div> : <div className="generated-report"><div className="generated-report-meta"><span>Generated from data as of <b>{asOf(report.as_of_date)}</b></span><span>Stored in MinIO · {report.provider_note ? "deterministic narrative used" : `${report.model} narrative`}</span></div><AssistantText text={report.narrative}/>{reportError && <p className="report-download-error">{reportError}</p>}<footer><button className="secondary" onClick={() => { setReport(null); setReportError(""); }}>Generate again</button><button onClick={downloadReport}>Download PDF</button></footer></div>}
       </section>
     </>}
   </main>;

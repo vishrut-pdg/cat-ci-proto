@@ -16,6 +16,7 @@ import PlantComparisonPage from "./pages/executive/PlantComparisonPage";
 import ProductComparisonPage from "./pages/executive/ProductComparisonPage";
 import ProductDetailPage from "./pages/executive/ProductDetailPage";
 import CategoryComparisonPage from "./pages/executive/CategoryComparisonPage";
+import CategoryDetailPage from "./pages/executive/CategoryDetailPage";
 import ComponentComparisonPage from "./pages/executive/ComponentComparisonPage";
 import ExecutivePlaceholderPage from "./pages/executive/ExecutivePlaceholderPage";
 
@@ -47,6 +48,7 @@ export default function App() {
         <Route path="/executive/products" element={<Shell><ProductComparisonPage/></Shell>}/>
         <Route path="/executive/products/:productId" element={<Shell><ProductDetailPage/></Shell>}/>
         <Route path="/executive/categories" element={<Shell><CategoryComparisonPage/></Shell>}/>
+        <Route path="/executive/categories/:categoryId" element={<Shell><CategoryDetailPage/></Shell>}/>
         <Route path="/executive/components/:componentId" element={<Shell><ComponentComparisonPage/></Shell>}/>
         <Route path="/executive/opportunities/:opportunityId" element={<Shell><ExecutivePlaceholderPage/></Shell>}/>
         <Route path="/executive/reports" element={<Shell><ExecutivePlaceholderPage/></Shell>}/>

@@ -4,3 +4,8 @@ export const money = (value: number, compact = true) => new Intl.NumberFormat("e
 }).format(value);
 
 export const percent = (value: number) => `${Number(value).toFixed(1)}%`;
+
+export const asOf = (value: string) => new Date(value).toLocaleString(undefined, {
+  dateStyle: "medium",
+  timeStyle: "short",
+});

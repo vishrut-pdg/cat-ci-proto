@@ -20,7 +20,7 @@ function Breadcrumbs({path}:{path:string}){
  if(isExecutive){
   const segments=path.split("/").filter(Boolean); const executiveLabels:Record<string,string>={plants:"Plant Comparison",products:"Product Comparison",categories:"Category Comparison",components:"Component Comparison",opportunities:"Opportunity Brief",reports:"Executive Report"};
   const items:{label:string;to?:string}[]=[{label:"Guidance Home",to:path===root?undefined:root}];
-  if(path!==root){const section=segments[1];items.push({label:executiveLabels[section]??"Workspace",to:segments.length>2&&section==="products"?"/executive/products":undefined});if(segments.length>2)items.push({label:segments[2]});}
+  if(path!==root){const section=segments[1];items.push({label:executiveLabels[section]??"Workspace",to:segments.length>2&&["products","categories"].includes(section)?`/executive/${section}`:undefined});if(segments.length>2)items.push({label:segments[2]});}
   return <nav className="app-breadcrumbs" aria-label="Breadcrumb"><ol>{items.map((item,index)=><li key={`${item.label}-${index}`}>{item.to?<Link to={item.to}>{item.label}</Link>:<span aria-current="page">{item.label}</span>}</li>)}</ol></nav>;
  }
  const detail=path.startsWith("/finance-analyst/opportunities/")||path.startsWith("/investigation-expert/my-investigations/");

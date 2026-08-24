@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import text
@@ -13,26 +13,28 @@ WITH latest_snapshot AS (
         m.annual_spend, m.potential_savings, m.impact_score,
         m.confidence_score
     FROM opportunity.metric_snapshots m
-    WHERE m.snapshot_at::date <= :as_of_date
+    WHERE m.snapshot_at <= :as_of_date
     ORDER BY m.opportunity_id, m.snapshot_at DESC
 ),
 primary_product AS (
     SELECT DISTINCT ON (pc.part_id)
         pc.part_id, em.id AS product_id,
         em.equipment_family || ' ' || em.model_code AS product_name,
-        em.equipment_family
+        em.equipment_family, ec.id AS category_id, ec.name AS category_name
     FROM catalog.part_compatibility pc
     JOIN catalog.equipment_models em ON em.id = pc.equipment_model_id
+    JOIN catalog.equipment_categories ec ON ec.id = em.category_id
     ORDER BY pc.part_id,
         CASE pc.compatibility_type WHEN 'PRIMARY' THEN 0 ELSE 1 END,
         em.id
 ),
 facts AS (
     SELECT o.id AS opportunity_id, o.status, o.priority, o.part_id,
-        p.component_id, p.name AS component_name, p.category,
+        p.component_id, p.name AS component_name, p.category AS part_classification,
         pl.id AS plant_id, pl.plant_code, pl.name AS plant_name,
         pl.country, pl.region, pp.product_id, pp.product_name,
-        pp.equipment_family, m.snapshot_at, m.unit_cost,
+        pp.equipment_family, pp.category_id, pp.category_name,
+        m.snapshot_at, m.unit_cost,
         m.peer_average_cost, m.variance_amount, m.variance_percent,
         m.annual_volume, m.annual_spend, m.potential_savings,
         m.impact_score, m.confidence_score
@@ -44,29 +46,33 @@ facts AS (
     WHERE (CAST(:region AS text) IS NULL OR pl.region = CAST(:region AS text))
       AND (CAST(:plant_id AS text) IS NULL OR pl.id = CAST(:plant_id AS text))
       AND (CAST(:product_id AS text) IS NULL OR pp.product_id = CAST(:product_id AS text))
+      AND (CAST(:category_id AS text) IS NULL OR pp.category_id = CAST(:category_id AS text))
 )
 """
 
 
 class ExecutiveRepository:
-    def get_as_of_date(self, db: Connection, requested: date) -> date:
+    def get_as_of_date(self, db: Connection, requested: datetime) -> datetime:
         value = db.execute(text("""
-            SELECT COALESCE(MAX(snapshot_at::date), :as_of_date)
+            SELECT COALESCE(MAX(snapshot_at), :as_of_date)
             FROM opportunity.metric_snapshots
-            WHERE snapshot_at::date <= :as_of_date
+            WHERE snapshot_at <= :as_of_date
         """), {"as_of_date": requested}).scalar_one()
         return value
 
     @staticmethod
     def _params(as_of_date: date, region: str | None = None,
-                plant_id: str | None = None, product_id: str | None = None) -> dict[str, Any]:
+                plant_id: str | None = None, product_id: str | None = None,
+                category_id: str | None = None) -> dict[str, Any]:
         return {"as_of_date": as_of_date, "region": region,
-                "plant_id": plant_id, "product_id": product_id}
+                "plant_id": plant_id, "product_id": product_id,
+                "category_id": category_id}
 
     def get_summary(self, db: Connection, *, as_of_date: date,
                     region: str | None = None, plant_id: str | None = None,
-                    product_id: str | None = None) -> dict[str, Any]:
-        params = self._params(as_of_date, region, plant_id, product_id)
+                    product_id: str | None = None,
+                    category_id: str | None = None) -> dict[str, Any]:
+        params = self._params(as_of_date, region, plant_id, product_id, category_id)
         row = db.execute(text(LATEST_FACTS_CTE + """
             SELECT COALESCE(SUM(potential_savings), 0) AS total_potential_savings,
                    COUNT(*)::int AS opportunity_count
@@ -76,7 +82,7 @@ class ExecutiveRepository:
         dimensions = {
             "top_plant": ("plant_id", "plant_name"),
             "top_product": ("product_id", "product_name"),
-            "top_category": ("category", "category"),
+            "top_category": ("category_id", "category_name"),
             "top_component": ("component_id", "component_name"),
         }
         result = dict(row)
@@ -98,8 +104,9 @@ class ExecutiveRepository:
 
     def get_quick_wins(self, db: Connection, *, as_of_date: date, limit: int,
                        region: str | None = None, plant_id: str | None = None,
-                       product_id: str | None = None) -> list[dict[str, Any]]:
-        params = self._params(as_of_date, region, plant_id, product_id) | {"limit": limit}
+                       product_id: str | None = None,
+                       category_id: str | None = None) -> list[dict[str, Any]]:
+        params = self._params(as_of_date, region, plant_id, product_id, category_id) | {"limit": limit}
         rows = db.execute(text(LATEST_FACTS_CTE + """
             SELECT ROW_NUMBER() OVER (
                        ORDER BY potential_savings DESC, confidence_score DESC, opportunity_id
@@ -125,8 +132,9 @@ class ExecutiveRepository:
 
     def get_plants(self, db: Connection, *, as_of_date: date,
                    region: str | None = None, plant_id: str | None = None,
-                   product_id: str | None = None) -> list[dict[str, Any]]:
-        params = self._params(as_of_date, region, plant_id, product_id)
+                   product_id: str | None = None,
+                   category_id: str | None = None) -> list[dict[str, Any]]:
+        params = self._params(as_of_date, region, plant_id, product_id, category_id)
         rows = db.execute(text(LATEST_FACTS_CTE + """
             , driver_totals AS (
                 SELECT f.plant_id, cd.driver_name, SUM(cd.impact_amount * f.annual_volume) AS impact
@@ -158,8 +166,9 @@ class ExecutiveRepository:
 
     def get_products(self, db: Connection, *, as_of_date: date,
                      region: str | None = None, plant_id: str | None = None,
-                     product_id: str | None = None) -> list[dict[str, Any]]:
-        params = self._params(as_of_date, region, plant_id, product_id)
+                     product_id: str | None = None,
+                     category_id: str | None = None) -> list[dict[str, Any]]:
+        params = self._params(as_of_date, region, plant_id, product_id, category_id)
         rows = db.execute(text(LATEST_FACTS_CTE + """
             , plant_costs AS (
                 SELECT product_id, plant_name,
@@ -173,6 +182,7 @@ class ExecutiveRepository:
                 FROM plant_costs
             )
             SELECT f.product_id, f.product_name, f.equipment_family,
+                f.category_id, f.category_name,
                 SUM(f.unit_cost * f.annual_volume) / NULLIF(SUM(f.annual_volume), 0) AS average_unit_cost,
                 pe.highest_cost_plant, pe.lowest_cost_plant,
                 SUM(f.variance_amount * f.annual_volume)
@@ -186,6 +196,7 @@ class ExecutiveRepository:
             JOIN product_extremes pe ON pe.product_id = f.product_id
             WHERE f.product_id IS NOT NULL
             GROUP BY f.product_id, f.product_name, f.equipment_family,
+                     f.category_id, f.category_name,
                      pe.highest_cost_plant, pe.lowest_cost_plant
             ORDER BY potential_savings DESC, f.product_id
         """), params).mappings().all()
@@ -196,7 +207,7 @@ class ExecutiveRepository:
                            plant_id: str | None = None) -> dict[str, Any] | None:
         params = self._params(as_of_date, region, plant_id, product_id)
         product = db.execute(text(LATEST_FACTS_CTE + """
-            SELECT product_id, product_name, equipment_family,
+            SELECT product_id, product_name, equipment_family, category_id, category_name,
                 SUM(unit_cost * annual_volume) / NULLIF(SUM(annual_volume), 0) AS average_unit_cost,
                 SUM(peer_average_cost * annual_volume) / NULLIF(SUM(annual_volume), 0) AS benchmark_unit_cost,
                 SUM(variance_amount * annual_volume) / NULLIF(SUM(annual_volume), 0) AS variance_amount,
@@ -214,7 +225,7 @@ class ExecutiveRepository:
                 MAX(snapshot_at) AS snapshot_at
             FROM facts
             WHERE product_id = :product_id
-            GROUP BY product_id, product_name, equipment_family
+            GROUP BY product_id, product_name, equipment_family, category_id, category_name
         """), params).mappings().first()
         if not product:
             return None
@@ -234,7 +245,7 @@ class ExecutiveRepository:
         """), params).mappings().all()
 
         components = db.execute(text(LATEST_FACTS_CTE + """
-            SELECT component_id, component_name, category,
+            SELECT component_id, component_name, part_classification,
                 SUM(potential_savings) AS potential_savings,
                 SUM(variance_amount * annual_volume)
                     / NULLIF(SUM(peer_average_cost * annual_volume), 0) * 100 AS variance_percent,
@@ -244,7 +255,7 @@ class ExecutiveRepository:
                     AS lead_opportunity_id
             FROM facts
             WHERE product_id = :product_id
-            GROUP BY component_id, component_name, category
+            GROUP BY component_id, component_name, part_classification
             ORDER BY potential_savings DESC, component_id
         """), params).mappings().all()
 
@@ -283,7 +294,7 @@ class ExecutiveRepository:
             JOIN primary_product pp ON pp.part_id = o.part_id
             JOIN supply.plants pl ON pl.id = o.plant_id
             WHERE pp.product_id = :product_id
-              AND m.snapshot_at::date <= :as_of_date
+              AND m.snapshot_at <= :as_of_date
               AND (CAST(:region AS text) IS NULL OR pl.region = CAST(:region AS text))
               AND (CAST(:plant_id AS text) IS NULL OR pl.id = CAST(:plant_id AS text))
             GROUP BY pl.id, pl.name, date_trunc('month', m.snapshot_at)::date
@@ -303,8 +314,9 @@ class ExecutiveRepository:
     def get_component_detail(self, db: Connection, *, component_id: str,
                              as_of_date: date, region: str | None = None,
                              plant_id: str | None = None,
-                             product_id: str | None = None) -> dict[str, Any] | None:
-        params = self._params(as_of_date, region, plant_id, product_id) | {"component_id": component_id}
+                             product_id: str | None = None,
+                             category_id: str | None = None) -> dict[str, Any] | None:
+        params = self._params(as_of_date, region, plant_id, product_id, category_id) | {"component_id": component_id}
         component = db.execute(text(LATEST_FACTS_CTE + """
             , snapshot_bounds AS (
                 SELECT o.id AS opportunity_id,
@@ -313,7 +325,7 @@ class ExecutiveRepository:
                 JOIN opportunity.metric_snapshots ms ON ms.opportunity_id = o.id
                 JOIN catalog.parts part ON part.id = o.part_id
                 WHERE part.component_id = :component_id
-                  AND ms.snapshot_at::date <= :as_of_date
+                  AND ms.snapshot_at <= :as_of_date
                 GROUP BY o.id
             ), tariff AS (
                 SELECT o.id AS opportunity_id,
@@ -324,7 +336,7 @@ class ExecutiveRepository:
                 JOIN opportunity.tariff_details td ON td.opportunity_id = o.id
                 WHERE part.component_id = :component_id
             )
-            SELECT f.component_id, f.component_name, f.category,
+            SELECT f.component_id, f.component_name, f.part_classification,
                 SUM(f.potential_savings) AS annual_opportunity,
                 SUM(f.annual_spend) AS annual_spend,
                 SUM(f.annual_volume)::int AS annual_volume,
@@ -350,7 +362,7 @@ class ExecutiveRepository:
             JOIN snapshot_bounds sb ON sb.opportunity_id = f.opportunity_id
             LEFT JOIN tariff t ON t.opportunity_id = f.opportunity_id
             WHERE f.component_id = :component_id
-            GROUP BY f.component_id, f.component_name, f.category
+            GROUP BY f.component_id, f.component_name, f.part_classification
         """), params).mappings().first()
         if not component:
             return None
@@ -416,10 +428,55 @@ class ExecutiveRepository:
         )
         return result
 
-    def get_categories(self, db: Connection, *, as_of_date: date,
-                       region: str | None = None, plant_id: str | None = None,
-                       product_id: str | None = None) -> dict[str, Any]:
-        params = self._params(as_of_date, region, plant_id, product_id)
+    def get_equipment_categories(self, db: Connection, *, as_of_date: date,
+                                 region: str | None = None,
+                                 plant_id: str | None = None,
+                                 product_id: str | None = None,
+                                 category_id: str | None = None) -> list[dict[str, Any]]:
+        params = self._params(as_of_date, region, plant_id, product_id, category_id)
+        rows = db.execute(text(LATEST_FACTS_CTE + """
+            , driver_totals AS (
+                SELECT f.category_id, cd.driver_name,
+                    SUM(cd.impact_amount * f.annual_volume) AS impact
+                FROM facts f
+                JOIN opportunity.cost_drivers cd ON cd.opportunity_id = f.opportunity_id
+                GROUP BY f.category_id, cd.driver_name
+            ), primary_drivers AS (
+                SELECT DISTINCT ON (category_id) category_id, driver_name
+                FROM driver_totals
+                ORDER BY category_id, impact DESC, driver_name
+            ), category_model_counts AS (
+                SELECT category_id, COUNT(*)::int AS product_count
+                FROM catalog.equipment_models
+                GROUP BY category_id
+            )
+            SELECT f.category_id, f.category_name,
+                cmc.product_count,
+                SUM(f.annual_spend) AS annual_spend,
+                SUM(f.potential_savings) AS potential_savings,
+                SUM(f.variance_amount * f.annual_volume)
+                    / NULLIF(SUM(f.peer_average_cost * f.annual_volume), 0) * 100
+                    AS cost_variance_percent,
+                COUNT(*) FILTER (WHERE f.priority = 'HIGH')::int
+                    AS high_priority_opportunities,
+                AVG(f.confidence_score) AS confidence,
+                pd.driver_name AS primary_opportunity_driver,
+                CASE WHEN COUNT(*) FILTER (WHERE f.priority = 'HIGH') > 0 THEN 'HIGH'
+                     WHEN MAX(f.variance_percent) >= 10 THEN 'MEDIUM' ELSE 'WATCH' END AS priority
+            FROM facts f
+            JOIN category_model_counts cmc ON cmc.category_id = f.category_id
+            LEFT JOIN primary_drivers pd ON pd.category_id = f.category_id
+            WHERE f.category_id IS NOT NULL
+            GROUP BY f.category_id, f.category_name, cmc.product_count, pd.driver_name
+            ORDER BY potential_savings DESC, f.category_id
+        """), params).mappings().all()
+        return [dict(row) for row in rows]
+
+    def get_cost_drivers(self, db: Connection, *, as_of_date: date,
+                         region: str | None = None, plant_id: str | None = None,
+                         product_id: str | None = None,
+                         category_id: str | None = None) -> dict[str, Any]:
+        params = self._params(as_of_date, region, plant_id, product_id, category_id)
         rows = db.execute(text(LATEST_FACTS_CTE + """
             , portfolio AS (
                 SELECT
@@ -439,8 +496,8 @@ class ExecutiveRepository:
             ), explained AS (
                 SELECT SUM(annualized_gap) AS total_gap FROM driver_totals
             )
-            SELECT dt.driver_code AS category_code,
-                dt.driver_name AS category,
+            SELECT dt.driver_code,
+                dt.driver_name,
                 p.benchmark_cost,
                 p.benchmark_cost
                     + dt.annualized_gap / NULLIF(p.total_volume, 0) AS comparison_cost,
@@ -455,15 +512,16 @@ class ExecutiveRepository:
         return {
             "overall_gap": sum((row["gap"] for row in items), 0),
             "contribution_total": sum((row["contribution_percent"] for row in items), 0),
-            "items": items,
+            "drivers": items,
         }
 
     def get_products_awaiting_decision(self, db: Connection, *, as_of_date: date,
                                        region: str | None = None,
                                        plant_id: str | None = None,
                                        product_id: str | None = None,
+                                       category_id: str | None = None,
                                        limit: int = 5) -> list[dict[str, Any]]:
-        params = self._params(as_of_date, region, plant_id, product_id) | {"limit": limit}
+        params = self._params(as_of_date, region, plant_id, product_id, category_id) | {"limit": limit}
         rows = db.execute(text(LATEST_FACTS_CTE + """
             SELECT product_id, product_name,
                 SUM(potential_savings) AS potential_savings,

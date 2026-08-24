@@ -284,10 +284,10 @@ class AssistantService:
         if "concentrat" in question or "greatest aggregate" in question:
             summary = context["summary"]
             facts = []
-            for label, key in (("Plant", "top_plant"), ("Product", "top_product"), ("Part category", "top_category"), ("Component", "top_component")):
+            for label, key in (("Plant", "top_plant"), ("Equipment category", "top_category"), ("Product", "top_product"), ("Component", "top_component")):
                 item = summary.get(key)
                 if item:
-                    facts.append(f"- **{label}: {item['name']}** — {usd(item['potential_savings'])} across {item['opportunity_count']} opportunities.")
+                    facts.append(f"- **{label}: {item['name']}** — {usd(item['potential_savings'])} across {item['attributed_opportunity_count']} attributed opportunities.")
             return "Value concentration by portfolio dimension:\n" + "\n".join(facts) + "\n\nThese dimensions overlap and should not be added together. Next: drill into the leading product or plant."
         if "decision" in question or "quarter" in question:
             rows = context["products_awaiting_decision"]
@@ -305,12 +305,21 @@ class AssistantService:
                 for row in context["quick_wins"]
             )
             return f"The fastest evidence-backed actions are:\n{facts}\n\nNext: open the first opportunity brief and send it to an investigation expert."
-        if "driver" in question or "category" in question:
+        if "category" in question:
             facts = "\n".join(
-                f"- **{row['category']}** — {float(row['contribution_percent']):.1f}% of the explained gap."
+                f"- **{row['category_name']}** — {usd(row['potential_savings'])}; "
+                f"{row['product_count']} products and {float(row['cost_variance_percent']):.1f}% weighted variance."
+                for row in context["categories"][:5]
+            )
+            return f"The highest-value equipment categories are:\n{facts}\n\nNext: open the leading category to see its product portfolio."
+        if "driver" in question:
+            if not context["cost_drivers"]:
+                return "Cost drivers are evaluated within a selected product. Open a product brief to compare supplier price, tariff, logistics, volume, and specification evidence."
+            facts = "\n".join(
+                f"- **{row['driver_name']}** — {float(row['contribution_percent']):.1f}% of the explained gap."
                 for row in context["cost_drivers"]
             )
-            return f"The explained cost gap is concentrated in:\n{facts}\n\nNext: open Category Comparison for benchmark-to-comparison reconciliation."
+            return f"The explained product cost gap is concentrated in:\n{facts}\n\nNext: review Cost Driver Analysis on the product brief."
         summary = context["summary"]
         return (
             f"The selected portfolio contains **{summary['opportunity_count']} opportunities** with "
@@ -332,6 +341,14 @@ class AssistantService:
             f"- {item['product_name']}: {money(item['potential_savings'])} across {item['opportunity_count']} opportunities."
             for item in decisions[:5]
         ) or "- No products are currently recorded in a decision-stage status."
+        category_text = "\n".join(
+            f"- {item['category_name']}: {money(item['potential_savings'])} across {item['product_count']} configured products."
+            for item in context.get("categories", [])[:5]
+        ) or "- No equipment-category evidence is available."
+        driver_text = "\n".join(
+            f"- {item['driver_name']}: {float(item['contribution_percent']):.1f}% of the explained product gap."
+            for item in context.get("cost_drivers", [])
+        ) or "- Select a product to include its structured cost-driver analysis."
         scope_label = (
             f"the {context['top_products'][0]['product_name']} product view"
             if context.get("product_id") and context.get("top_products")
@@ -340,9 +357,15 @@ class AssistantService:
         return (
             "## Executive summary\n"
             f"As of {context['as_of_date']}, {scope_label} contains {summary['opportunity_count']} current opportunities with {money(summary['total_potential_savings'])} in validated potential savings.\n\n"
-            "## Value concentration\n"
-            f"The leading plant is {leader('top_plant')}, the leading product is {leader('top_product')}, the leading category is {leader('top_category')}, and the leading component is {leader('top_component')}. These are backend-ranked concentrations, not additive portfolio totals.\n\n"
-            "## Priority actions\n" + wins + "\n\n"
+            "## Category performance\n" + category_text + "\n\n"
+            "## Product opportunities\n"
+            f"The leading product is {leader('top_product')}.\n\n"
+            "## Plant performance\n"
+            f"The leading plant is {leader('top_plant')}.\n\n"
+            "## Component opportunities\n"
+            f"The leading component is {leader('top_component')}.\n\n"
+            "## Cost driver analysis\n" + driver_text + "\n\n"
+            "## Recommended actions\n" + wins + "\n\n"
             "## Decisions required\n" + decision_text +
             "\nRoute the selected opportunity into the existing investigation workflow before recording a recommendation or decision."
         )

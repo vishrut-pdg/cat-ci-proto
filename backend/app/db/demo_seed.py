@@ -47,6 +47,7 @@ def _execute_copy_seed(connection: psycopg.Connection, seed_path: Path) -> None:
 def refresh_demo_data() -> None:
     seed_path = Path(os.getenv("DEMO_SEED_PATH", "/demo-seed/001_seed.sql.gz"))
     executive_seed_path = Path(os.getenv("EXECUTIVE_SEED_PATH", "/demo-seed/002_executive_role.sql"))
+    taxonomy_seed_path = Path(os.getenv("EQUIPMENT_TAXONOMY_SEED_PATH", "/demo-seed/003_equipment_categories.sql"))
     if not seed_path.exists():
         raise RuntimeError(f"Demo seed file not found: {seed_path}")
 
@@ -58,6 +59,21 @@ def refresh_demo_data() -> None:
             _execute_copy_seed(connection, seed_path)
             if executive_seed_path.exists():
                 connection.execute(executive_seed_path.read_text(encoding="utf-8"))
+            if taxonomy_seed_path.exists():
+                connection.execute(taxonomy_seed_path.read_text(encoding="utf-8"))
+            # Preserve deterministic values and the twelve-point history while
+            # making the newest snapshot reflect this demo rebuild.
+            connection.execute("""
+                WITH latest AS (
+                    SELECT MAX(snapshot_at) AS snapshot_at
+                    FROM opportunity.metric_snapshots
+                )
+                UPDATE opportunity.metric_snapshots AS snapshot
+                SET snapshot_at = snapshot.snapshot_at
+                    + (CURRENT_TIMESTAMP - latest.snapshot_at)
+                FROM latest
+                WHERE latest.snapshot_at IS NOT NULL
+            """)
         finally:
             connection.execute("SELECT pg_advisory_unlock(42642026)")
 

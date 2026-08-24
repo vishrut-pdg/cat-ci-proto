@@ -45,6 +45,8 @@ export interface ProductExecutiveItem {
   product_id: string;
   product_name: string;
   equipment_family: string;
+  category_id: string;
+  category_name: string;
   average_unit_cost: number;
   highest_cost_plant: string | null;
   lowest_cost_plant: string | null;
@@ -54,18 +56,39 @@ export interface ProductExecutiveItem {
   opportunity_count: number;
 }
 
-export interface CategoryExecutiveItem {
-  category_code: string;
-  category: string;
+export interface EquipmentCategory {
+  category_id: string;
+  category_name: string;
+  product_count: number;
+  annual_spend: number;
+  potential_savings: number;
+  cost_variance_percent: number;
+  high_priority_opportunities: number;
+  confidence: number;
+  primary_opportunity_driver: string | null;
+  priority: "HIGH" | "MEDIUM" | "WATCH";
+}
+
+export interface EquipmentCategoriesResponse {
+  as_of_date: string;
+  categories: EquipmentCategory[];
+}
+
+export interface CostDriver {
+  driver_code: string;
+  driver_name: string;
   benchmark_cost: number;
   comparison_cost: number;
   gap: number;
   contribution_percent: number;
 }
 
-export interface CategoriesResponse extends DatedList<CategoryExecutiveItem> {
+export interface CostDriversResponse {
+  as_of_date: string;
+  product_id: string;
   overall_gap: number;
   contribution_total: number;
+  drivers: CostDriver[];
 }
 
 export interface ExecutiveAssistantReply {
@@ -95,7 +118,7 @@ export interface ProductPlantItem {
 export interface ProductComponentItem {
   component_id: string;
   component_name: string;
-  category: string;
+  part_classification: string;
   potential_savings: number;
   variance_percent: number;
   confidence_score: number;
@@ -108,6 +131,8 @@ export interface ProductDetailResponse {
   product_id: string;
   product_name: string;
   equipment_family: string;
+  category_id: string;
+  category_name: string;
   average_unit_cost: number;
   benchmark_unit_cost: number;
   variance_amount: number;
@@ -161,7 +186,7 @@ export interface ComponentDetailResponse {
   as_of_date: string;
   component_id: string;
   component_name: string;
-  category: string;
+  part_classification: string;
   annual_opportunity: number;
   annual_spend: number;
   annual_volume: number;

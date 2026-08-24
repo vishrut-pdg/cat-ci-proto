@@ -31,6 +31,10 @@ def _clean(value: str) -> str:
     return value.translate(str.maketrans({"\u2011": "-", "\u2013": "-", "\u2014": "-", "\u2018": "'", "\u2019": "'", "\u201c": '"', "\u201d": '"'}))
 
 
+def _as_of(value) -> str:
+    return value.strftime("%d %b %Y, %H:%M %Z") if hasattr(value, "strftime") else str(value)
+
+
 def _page(canvas, document):
     canvas.saveState()
     canvas.setFillColor(NAVY)
@@ -73,7 +77,7 @@ def build_executive_report_pdf(context: dict, narrative: str) -> bytes:
         Paragraph(
             f"{escape(context['period'])} | "
             f"{escape(context.get('product_id') or context['scope']).title()} scope | "
-            f"Data as of {context['as_of_date']}", subtitle,
+            f"Data as of {_as_of(context['as_of_date'])}", subtitle,
         ),
     ]
     metric_data = [[
@@ -107,7 +111,7 @@ def build_executive_report_pdf(context: dict, narrative: str) -> bytes:
 
     story.extend([PageBreak(), Paragraph("Portfolio priorities", title), Paragraph("Backend-ranked measures; AI does not calculate these values.", subtitle)])
     priority_rows = [["Dimension", "Leader", "Potential savings", "Variance"]]
-    for label, key in (("Plant", "top_plant"), ("Product", "top_product"), ("Category", "top_category"), ("Component", "top_component")):
+    for label, key in (("Plant", "top_plant"), ("Category", "top_category"), ("Product", "top_product"), ("Component", "top_component")):
         item = summary.get(key)
         priority_rows.append([label, item["name"] if item else "Not available", _money(item["potential_savings"] if item else 0), f"{float(item['variance_percent']):.1f}%" if item else "-"])
     priorities = Table(priority_rows, colWidths=[31 * mm, 70 * mm, 43 * mm, 32 * mm], repeatRows=1)
@@ -125,6 +129,33 @@ def build_executive_report_pdf(context: dict, narrative: str) -> bytes:
     products = Table(product_rows, colWidths=[61 * mm, 35 * mm, 25 * mm, 55 * mm], repeatRows=1)
     products.setStyle(_table_style())
     story.append(products)
+    story.extend([
+        PageBreak(), Paragraph("Category performance", title),
+        Paragraph("Category means CAT equipment family; cost drivers are reported separately.", subtitle),
+    ])
+    category_rows = [["Equipment category", "Products", "Annual spend", "Opportunity", "Variance", "Primary driver"]]
+    for item in context.get("categories", [])[:8]:
+        category_rows.append([
+            Paragraph(escape(item["category_name"]), small), str(item["product_count"]),
+            _money(item["annual_spend"]), _money(item["potential_savings"]),
+            f"{float(item['cost_variance_percent']):.1f}%",
+            Paragraph(escape(item.get("primary_opportunity_driver") or "Not available"), small),
+        ])
+    categories = Table(category_rows, colWidths=[40 * mm, 18 * mm, 31 * mm, 31 * mm, 23 * mm, 33 * mm], repeatRows=1)
+    categories.setStyle(_table_style())
+    story.append(categories)
+    if context.get("cost_drivers"):
+        story.extend([Spacer(1, 9 * mm), Paragraph("Cost driver analysis", heading)])
+        driver_rows = [["Cost driver", "Benchmark", "Comparison", "Gap", "Contribution"]]
+        for item in context["cost_drivers"]:
+            driver_rows.append([
+                Paragraph(escape(item["driver_name"]), small), _money(item["benchmark_cost"]),
+                _money(item["comparison_cost"]), _money(item["gap"]),
+                f"{float(item['contribution_percent']):.1f}%",
+            ])
+        drivers = Table(driver_rows, colWidths=[52 * mm, 32 * mm, 34 * mm, 28 * mm, 30 * mm], repeatRows=1)
+        drivers.setStyle(_table_style())
+        story.append(drivers)
     document.build(story, onFirstPage=_page, onLaterPages=_page)
     return buffer.getvalue()
 

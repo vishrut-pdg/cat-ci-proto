@@ -1,5 +1,5 @@
 import { apiDownload, apiGet, apiRequest } from "./api";
-import type { CategoriesResponse, ComponentDetailResponse, DatedList, ExecutiveAssistantReply, ExecutiveSummary, GeneratedExecutiveReport, PlantExecutiveItem, ProductDetailResponse, ProductsResponse, ProductTrendResponse, QuickWin } from "../types/executive";
+import type { ComponentDetailResponse, CostDriversResponse, DatedList, EquipmentCategoriesResponse, ExecutiveAssistantReply, ExecutiveSummary, GeneratedExecutiveReport, PlantExecutiveItem, ProductDetailResponse, ProductsResponse, ProductTrendResponse, QuickWin } from "../types/executive";
 
 export interface ExecutiveFilters {
   period?: string;
@@ -7,6 +7,7 @@ export interface ExecutiveFilters {
   region?: string;
   plant_id?: string;
   product_id?: string;
+  category_id?: string;
   as_of_date?: string;
   limit?: string;
 }
@@ -24,8 +25,8 @@ export const getExecutivePlants = (filters?: ExecutiveFilters) => apiGet<DatedLi
 export const getExecutiveProducts = (filters?: ExecutiveFilters) => apiGet<ProductsResponse>(`/executive/products${query(filters)}`);
 export const getExecutiveProduct = (productId: string, filters?: ExecutiveFilters) => apiGet<ProductDetailResponse>(`/executive/products/${encodeURIComponent(productId)}${query(filters)}`);
 export const getExecutiveProductTrend = (productId: string, filters?: ExecutiveFilters) => apiGet<ProductTrendResponse>(`/executive/products/${encodeURIComponent(productId)}/trend${query(filters)}`);
-export const getExecutiveProductCostDrivers = (productId: string, filters?: ExecutiveFilters) => apiGet<CategoriesResponse>(`/executive/products/${encodeURIComponent(productId)}/cost-drivers${query(filters)}`);
-export const getExecutiveCategories = (filters?: ExecutiveFilters) => apiGet<CategoriesResponse>(`/executive/categories${query(filters)}`);
+export const getExecutiveProductCostDrivers = (productId: string, filters?: ExecutiveFilters) => apiGet<CostDriversResponse>(`/executive/products/${encodeURIComponent(productId)}/cost-drivers${query(filters)}`);
+export const getExecutiveCategories = (filters?: ExecutiveFilters) => apiGet<EquipmentCategoriesResponse>(`/executive/categories${query(filters)}`);
 export const getExecutiveComponent = (componentId: string, filters?: ExecutiveFilters) => apiGet<ComponentDetailResponse>(`/executive/components/${encodeURIComponent(componentId)}${query(filters)}`);
 export const getExecutiveReport = (filters?: ExecutiveFilters) => apiGet<unknown>(`/executive/report${query(filters)}`);
 export const askExecutiveKatty = (message: string, sessionId: string | undefined, filters: ExecutiveFilters) => apiRequest<ExecutiveAssistantReply>("/assistant/executive/chat", "POST", {

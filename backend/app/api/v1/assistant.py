@@ -1,3 +1,4 @@
+import logging
 from typing import Annotated
 from fastapi import APIRouter,Depends,HTTPException
 from pydantic import BaseModel, Field
@@ -6,6 +7,7 @@ from app.auth.demo_auth import current_user, require_role
 from app.db.session import get_db
 from app.services.assistant_service import assistant_service
 router=APIRouter(prefix="/assistant",tags=["Assistant"])
+logger = logging.getLogger(__name__)
 class ChatBody(BaseModel): opportunity_id:str; message:str; session_id:str|None=None
 class ExecutiveChatBody(BaseModel):
     message: str = Field(min_length=1, max_length=2000)
@@ -51,7 +53,9 @@ def executive_report(
     except ValueError as error:
         raise HTTPException(422, str(error)) from error
     except Exception as error:
-        raise HTTPException(503, f"Report generation failed: {type(error).__name__}") from error
+        logger.exception("Executive report generation failed")
+        detail = str(error).strip() or type(error).__name__
+        raise HTTPException(503, f"Report generation failed: {detail}") from error
 
 @router.get("/sessions/{session_id}")
 def session_history(session_id:str,db:Annotated[Connection,Depends(get_db)],user:Annotated[dict,Depends(current_user)]):

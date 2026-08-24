@@ -1,7 +1,6 @@
 import { Link, useLocation, useParams } from "react-router";
 
 const copy: Record<string, [string, string]> = {
-  categories: ["Category comparison", "Structured cost-driver reconciliation will appear here in the drill-down checkpoint."],
   components: ["Component brief", "Supplier, volume, tariff, and commercial evidence will appear here for the selected component."],
   opportunities: ["Opportunity brief", "This portfolio item is ready to connect to the existing assignment and investigation lifecycle in the workflow checkpoint."],
   reports: ["Executive report", "The canonical report API is available; branded PDF composition follows in the reporting checkpoint."],
@@ -11,8 +10,7 @@ const copy: Record<string, [string, string]> = {
 export default function ExecutivePlaceholderPage() {
   const location = useLocation();
   const params = useParams();
-  const key = location.pathname.includes("/categories") ? "categories"
-    : location.pathname.includes("/components/") ? "components"
+  const key = location.pathname.includes("/components/") ? "components"
       : location.pathname.includes("/opportunities/") ? "opportunities"
         : location.pathname.includes("/reports") ? "reports" : "products";
   const [title, detail] = copy[key];
